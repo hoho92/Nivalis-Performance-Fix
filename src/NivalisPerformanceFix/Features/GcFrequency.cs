@@ -1,5 +1,6 @@
 using BepInEx.Configuration;
 using NivalisPerformanceFix.Native;
+using UnityEngine;
 
 namespace NivalisPerformanceFix.Features;
 
@@ -10,6 +11,9 @@ namespace NivalisPerformanceFix.Features;
 /// (halved in incremental mode). GC_free_space_divisor is a plain global (vanilla 3); we find it through the
 /// `div qword ptr [rip+x]` in min_bytes_allocd. Divisor 1 = cycles ~4x less often (hitch every ~18 s), same hitch
 /// size, at the cost of a larger managed heap.
+/// While the game is paused (timeScale 0) and when quitting, the game's value is restored: hitches don't matter
+/// there, and the game keeps allocating while paused (1.0.0: heap grew ~80 MB/min with no GC during a 28 min
+/// pause, followed by a hang on quit).
 /// </summary>
 internal sealed unsafe class GcFrequency : Feature
 {
@@ -26,6 +30,7 @@ internal sealed unsafe class GcFrequency : Feature
     private const int DispOffset = 20, NextInsn = 24;
 
     private ulong* global;
+    private bool quitting;
     private ulong vanilla;
 
     protected override void BindSettings(ConfigFile config)
@@ -43,6 +48,7 @@ internal sealed unsafe class GcFrequency : Feature
         ulong* d = (ulong*)(hit + NextInsn + *(int*)(hit + DispOffset));
         if (*d < 1 || *d > 100) return $"implausible divisor value {*d}";
         global = d; vanilla = *d;
+        Application.add_quitting(new System.Action(RestoreVanilla));
         Tick();
         return null;
     }
@@ -50,7 +56,13 @@ internal sealed unsafe class GcFrequency : Feature
     public override void Tick()
     {
         if (global == null) return;
-        ulong want = Active ? (ulong)divisor.Value : vanilla;
+        ulong want = Active && !quitting && Time.timeScale != 0f ? (ulong)divisor.Value : vanilla;
         if (want >= 1 && *global != want) *global = want;
+    }
+
+    private void RestoreVanilla()
+    {
+        quitting = true;
+        if (global != null) *global = vanilla;
     }
 }

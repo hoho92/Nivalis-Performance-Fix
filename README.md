@@ -42,7 +42,7 @@ Nothing changes gameplay or saves. Every optimization can be switched off in the
 1. Extract the archive into the game folder (the one with `Nivalis Nights.exe`), so you get
    `BepInEx/plugins/NivalisPerformanceFix/NivalisPerformanceFix.dll`.
 2. Start the game. The BepInEx console shows:
-   `Nivalis Performance Fix 1.0.0: 6/6 optimizations active`
+   `Nivalis Performance Fix 1.0.1: 6/6 optimizations active`
 3. **The first time only**: the console asks you to **restart the game**. The job thread setting is read when the
    engine starts, so it only applies from the next launch.
 

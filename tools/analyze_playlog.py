@@ -25,7 +25,8 @@ def parse(line):
     for kv in parts[3:]:
         if '=' in kv:
             k, v = kv.split('=', 1)
-            try: rec[k] = float(v) if k not in ('scene', 'pos', 'version') else v
+            # 1.0.0 wrote some values with a decimal comma (fps=318,0)
+            try: rec[k] = float(v.replace(',', '.')) if k not in ('scene', 'pos', 'version') else v
             except ValueError: rec[k] = v
     return rec
 

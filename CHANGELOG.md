@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.0.1 — 2026-10-03
+
+- Garbage collector frequency: back to the game's value while paused and when quitting. During long pauses the
+  game kept allocating with no GC (memory grew ~80 MB/min); one quit after a 28 min pause hung.
+- Developer play log: numbers always written with a decimal point (some were written with a comma).
+
 ## 1.0.0 — 2026-10-03
 
 First release, for the game build of 2026-10-02.

@@ -42,7 +42,7 @@ Rien ne change au gameplay ni aux sauvegardes. Chaque optimisation peut être d�
 1. Extraire l'archive dans le dossier du jeu (celui qui contient `Nivalis Nights.exe`), pour obtenir
    `BepInEx/plugins/NivalisPerformanceFix/NivalisPerformanceFix.dll`.
 2. Lancer le jeu. La console BepInEx affiche :
-   `Nivalis Performance Fix 1.0.0: 6/6 optimizations active`
+   `Nivalis Performance Fix 1.0.1: 6/6 optimizations active`
 3. **La première fois seulement** : la console demande de **relancer le jeu**. Le nombre de threads est lu au
    démarrage du moteur, il ne s'applique donc qu'au lancement suivant.
 

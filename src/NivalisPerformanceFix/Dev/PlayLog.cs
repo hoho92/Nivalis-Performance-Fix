@@ -93,7 +93,7 @@ internal sealed class PlayLog
         double sum = sorted.Sum(x => (double)x);
         int n1 = Math.Max(1, sorted.Count / 100);
         double worst = sorted.Skip(sorted.Count - n1).Sum(x => (double)x);
-        Write($"MIN secs={periodTime:F0} frames={sorted.Count} fps={sorted.Count / sum:F1} low1={n1 / worst:F1} " +
+        Write($"MIN secs={F(periodTime, "F0")} frames={sorted.Count} fps={F(sorted.Count / sum, "F1")} low1={F(n1 / worst, "F1")} " +
               $"p99={Ms(sorted[(int)(sorted.Count * 0.99)])} max={Ms(sorted[^1])} " +
               $"over20={sorted.Count(x => x > 0.020f)} over30={sorted.Count(x => x > 0.030f)} " +
               $"gcs={gc - periodGcStart} {Context()}");
@@ -113,6 +113,7 @@ internal sealed class PlayLog
     }
 
     private static string Fps(List<float> dts) => dts.Count == 0 ? "0" : (dts.Count / dts.Sum()).ToString("F1", CultureInfo.InvariantCulture);
+    private static string F(double v, string fmt) => v.ToString(fmt, CultureInfo.InvariantCulture);
     private static string Ms(float s) => (s * 1000).ToString("F1", CultureInfo.InvariantCulture);
 
     private static string Context()
