@@ -25,7 +25,8 @@ Each one can be turned off in the config.
 
 1. Install [BepInEx 6 IL2CPP, build 788](https://builds.bepinex.dev/projects/bepinex_be/788/BepInEx-Unity.IL2CPP-win-x64-6.0.0-be.788%2B5b766a3.zip)
    (not the regular BepInEx 5): extract it into the game folder and launch the game once.
-2. Download the [latest release](https://github.com/hoho92/Nivalis-Performance-Fix/releases/latest) and extract it
+2. Download the mod from [Nexus Mods](https://www.nexusmods.com/nivalisnights/mods/57) or the
+   [latest release](https://github.com/hoho92/Nivalis-Performance-Fix/releases/latest) here, and extract it
    into the game folder, next to `Nivalis Nights.exe`.
 3. Launch the game, then **restart it once**. The thread setting is only read when the game starts.
 
