@@ -1,0 +1,42 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net6.0</TargetFramework>
+    <AssemblyName>NivalisPerformanceFix</AssemblyName>
+    <RootNamespace>NivalisPerformanceFix</RootNamespace>
+    <Version>1.0.0</Version>
+    <Authors>hoho92</Authors>
+    <Description>CPU performance and stutter fixes for Nivalis Nights (BepInEx IL2CPP).</Description>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <Nullable>disable</Nullable>
+    <LangVersion>latest</LangVersion>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+    <CopyLocalLockFileAssemblies>false</CopyLocalLockFileAssemblies>
+    <!-- Game folder with BepInEx 6 (IL2CPP) installed and run once. Override: dotnet build -p:GameDir="D:\...\Nivalis Nights" -->
+    <GameDir Condition="'$(GameDir)' == ''">C:\Games\Steam\steamapps\common\Nivalis Nights</GameDir>
+    <!-- Release builds are copied into the game; set to false to only build. -->
+    <InstallToGame Condition="'$(InstallToGame)' == ''">true</InstallToGame>
+  </PropertyGroup>
+
+  <ItemDefinitionGroup>
+    <Reference><Private>false</Private></Reference>
+  </ItemDefinitionGroup>
+
+  <ItemGroup>
+    <Reference Include="$(GameDir)\BepInEx\core\BepInEx.Core.dll" />
+    <Reference Include="$(GameDir)\BepInEx\core\BepInEx.Unity.IL2CPP.dll" />
+    <Reference Include="$(GameDir)\BepInEx\core\0Harmony.dll" />
+    <Reference Include="$(GameDir)\BepInEx\core\Il2CppInterop.Runtime.dll" />
+    <Reference Include="$(GameDir)\BepInEx\core\Il2CppInterop.Common.dll" />
+    <Reference Include="$(GameDir)\BepInEx\interop\Il2Cppmscorlib.dll" />
+    <Reference Include="$(GameDir)\BepInEx\interop\Assembly-CSharp.dll" />
+    <Reference Include="$(GameDir)\BepInEx\interop\UnityEngine.CoreModule.dll" />
+    <Reference Include="$(GameDir)\BepInEx\interop\Unity.InputSystem.dll" />
+  </ItemGroup>
+
+  <Target Name="InstallToGame" AfterTargets="Build"
+          Condition="'$(Configuration)' == 'Release' And '$(InstallToGame)' == 'true' And Exists('$(GameDir)\BepInEx\plugins')">
+    <Copy SourceFiles="$(TargetPath)" DestinationFolder="$(GameDir)\BepInEx\plugins\NivalisPerformanceFix" />
+  </Target>
+
+</Project>
