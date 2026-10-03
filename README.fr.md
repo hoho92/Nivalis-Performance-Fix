@@ -18,6 +18,9 @@ sauvegardes ne changent pas.
 - **Caméras d'arrière-plan.** Les caméras du ciel et des traces dans la neige font leur rendu une image sur
   plusieurs.
 - **Emploi du temps et trajets des PNJ.** Les PNJ replanifient leur journée et relisent leur chemin moins souvent.
+- **Éclairage dans certaines zones.** Corrige une recherche d'éclairage de Unity qui pouvait boucler des milliers de
+  fois par image. À 13_Stacks, après y être arrivé par une transition de zone, le jeu est passé d'environ 40 à
+  environ 140 FPS.
 - **Nettoyage de la mémoire.** Le nettoyage du jeu, qui provoque une petite saccade, passe environ 4 fois moins
   souvent.
 - **Tracked Quests HUD.** Si tu utilises le mod *Tracked Quests HUD* de Hvizeu, une saccade qu'il provoque quand
@@ -37,7 +40,8 @@ Chaque changement peut être désactivé dans la config.
 Après une mise à jour du jeu ou une vérification des fichiers par Steam, le mod réapplique le réglage et redemande
 une relance.
 
-Pour vérifier que le mod tourne, la console BepInEx affiche `Nivalis Performance Fix 1.0.1: 6/6 optimizations active`.
+Pour vérifier que le mod tourne, la console BepInEx affiche `Nivalis Performance Fix 1.0.2: 6/6 optimizations active`
+(7/7 avec Tracked Quests HUD).
 
 ## Configuration
 
@@ -68,7 +72,7 @@ le reprendre.
 
 Les changements viennent du profilage du jeu avec PIX et de la lecture du code désassemblé. Le mod modifie
 `Character.LateUpdateAll` (postfix), `ActiveJournalEntriesUi.Refresh` (prefix, seulement avec Tracked Quests HUD) et
-trois appels dans le code natif, chacun retrouvé par signature d'octets.
+trois appels dans le code natif du jeu et un dans le moteur Unity, chacun retrouvé par signature d'octets.
 
 Les outils de développement sont désactivés par défaut (`[Developer] Enabled = true`) :
 

@@ -15,6 +15,8 @@ disappeared. Results depend on your CPU and where you are. Visuals, gameplay and
 - **Distant characters.** People far away or off-screen update their animation less often.
 - **Background cameras.** The sky and snow-footprint cameras render every few frames instead of every frame.
 - **NPC schedules and paths.** NPCs re-plan their day and re-read their path less often.
+- **Lighting in some areas.** Fixes a Unity lighting lookup that could loop thousands of times per frame. In
+  13_Stacks, after arriving through a zone transition, this took the game from about 40 to about 140 FPS.
 - **Memory cleanup.** The game's cleanup pass, which causes a short hitch, runs about 4 times less often.
 - **Tracked Quests HUD.** If you use Hvizeu's *Tracked Quests HUD*, a hitch it causes when no quest is pinned is
   removed.
@@ -32,7 +34,8 @@ Each one can be turned off in the config.
 
 After a game update or a Steam file check, the mod applies the thread setting again and asks for one more restart.
 
-To check it's running, the BepInEx console shows `Nivalis Performance Fix 1.0.1: 6/6 optimizations active`.
+To check it's running, the BepInEx console shows `Nivalis Performance Fix 1.0.2: 6/6 optimizations active`
+(7/7 with Tracked Quests HUD).
 
 ## Configuration
 
@@ -62,7 +65,7 @@ I stop, updates may stop too. The code is MIT-licensed, so anyone is welcome to 
 
 The changes come from profiling the game with PIX and reading the disassembly. The mod patches
 `Character.LateUpdateAll` (postfix), `ActiveJournalEntriesUi.Refresh` (prefix, only with Tracked Quests HUD) and
-three call sites in native code, each found by byte signature.
+three call sites in the game's native code plus one in Unity's engine, each found by byte signature.
 
 Developer tools are off by default (`[Developer] Enabled = true`):
 
