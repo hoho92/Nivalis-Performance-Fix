@@ -40,7 +40,7 @@ Chaque changement peut être désactivé dans la config.
 Après une mise à jour du jeu ou une vérification des fichiers par Steam, le mod réapplique le réglage et redemande
 une relance.
 
-Pour vérifier que le mod tourne, la console BepInEx affiche `Nivalis Performance Fix 1.0.2: 6/6 optimizations active`
+Pour vérifier que le mod tourne, la console BepInEx affiche `Nivalis Performance Fix 1.0.3: 6/6 optimizations active`
 (7/7 avec Tracked Quests HUD).
 
 ## Configuration

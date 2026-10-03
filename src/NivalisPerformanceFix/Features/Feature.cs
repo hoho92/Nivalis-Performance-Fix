@@ -48,6 +48,13 @@ internal abstract class Feature
         Installed = Problem == null;
     }
 
+    /// <summary>Turns the feature off until the game is restarted, without touching the config file.</summary>
+    public void DisableForSession(string reason)
+    {
+        Problem = reason;
+        Installed = false;
+    }
+
     /// <summary>Called once per frame from the plugin behaviour (main thread).</summary>
     public virtual void Tick() { }
 

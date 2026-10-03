@@ -34,7 +34,7 @@ Each one can be turned off in the config.
 
 After a game update or a Steam file check, the mod applies the thread setting again and asks for one more restart.
 
-To check it's running, the BepInEx console shows `Nivalis Performance Fix 1.0.2: 6/6 optimizations active`
+To check it's running, the BepInEx console shows `Nivalis Performance Fix 1.0.3: 6/6 optimizations active`
 (7/7 with Tracked Quests HUD).
 
 ## Configuration

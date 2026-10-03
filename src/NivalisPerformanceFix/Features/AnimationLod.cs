@@ -101,8 +101,8 @@ internal sealed unsafe class AnimationLod : Feature
         }
         catch (Exception e)
         {
-            Plugin.Log.LogError($"{self.Name} disabled after an error: {e.Message}");
-            self.Enabled.Value = false;
+            Plugin.Log.LogError($"{self.Name} disabled until restart after an error: {e.Message}");
+            self.DisableForSession("error: " + e.Message);
         }
     }
 

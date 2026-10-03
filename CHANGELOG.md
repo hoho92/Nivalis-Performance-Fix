@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.0.3 — 2026-10-03
+
+- Animation LOD: after an unexpected error it now turns itself off only until the game is restarted. Before, it
+  switched itself off in the config file, so it stayed off for good even once the cause was gone.
+
 ## 1.0.2 — 2026-10-03
 
 - Light probe walk limit: Unity's per-frame light probe search could loop for thousands of steps in some areas
