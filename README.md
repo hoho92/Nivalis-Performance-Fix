@@ -1,106 +1,83 @@
-# Nivalis Performance Fix
+![Nivalis Performance Fix](docs/banner.jpg)
 
 *[Version française](README.fr.md)*
 
-A BepInEx mod that removes CPU bottlenecks and stutters in **Nivalis Nights**. Nivalis Nights is limited by the
-CPU in busy places (markets, crowds), not by the graphics card. This mod targets what the game's main thread
-actually spends its time on, found by profiling the game (PIX captures and disassembly).
+Nivalis Nights can struggle in busy places like the markets, and a powerful graphics card doesn't help much: the
+game is held back by the CPU. This BepInEx mod takes load off the CPU where you can't see the difference.
 
-Measured on a Ryzen 7 9800X3D, busy market, standing still (automatic A/B benchmark, 3 rounds, same session):
+In my tests, a crowded market went from about 90 to about 118 FPS, and stutters while walking around town mostly
+disappeared. Results depend on your CPU and where you are. Visuals, gameplay and saves don't change.
 
-| | average FPS | 1% low FPS |
-|---|---|---|
-| Optimizations off (job threads already at 6) | 89.4 | 58.8 |
-| **Optimizations on** | **118.1** | **85.5** |
+## What it changes
 
-That is +32% average and +45% 1% lows, on top of the job thread setting (+18% on its own: 77.5 → 91.1 FPS).
+- **Worker threads.** Sets the engine's worker thread count to suit your CPU. The game's default wastes time waking
+  up too many threads.
+- **Distant characters.** People far away or off-screen update their animation less often.
+- **Background cameras.** The sky and snow-footprint cameras render every few frames instead of every frame.
+- **NPC schedules and paths.** NPCs re-plan their day and re-read their path less often.
+- **Memory cleanup.** The game's cleanup pass, which causes a short hitch, runs about 4 times less often.
+- **Tracked Quests HUD.** If you use Hvizeu's *Tracked Quests HUD*, a hitch it causes when no quest is pinned is
+  removed.
 
-While walking around town, stutters over 30 ms went from 27 per 90 s to 0 (together with a 1000 Hz mouse, see below).
-Your gains depend on your CPU and where you are in the game.
+Each one can be turned off in the config.
 
-## What it does
+## Install
 
-| Optimization | What it changes | Measured gain |
-|---|---|---|
-| **Job worker threads** | Sets Unity's worker thread count from your CPU (physical cores − 2, between 2 and 8) in `boot.config`. The game wakes its workers thousands of times per second; too many workers cost more than they help. | +18–21% FPS |
-| **Animation LOD** | Far and off-screen characters update their animation every few frames instead of every frame (closest characters unchanged). | +7% FPS, 1% lows +28% |
-| **Offscreen camera throttle** | The sky and snow-footprint helper cameras render every 2 / 4 frames instead of every frame. No visible difference. | +8% FPS, 1% lows +47% |
-| **Agent schedule throttle** | Simulated NPCs re-check their schedule every 8 frames instead of every frame. | +2.5% FPS |
-| **Navigation path throttle** | Walking NPCs re-read their path every 4 frames instead of copying it every frame. | +2.3% FPS, 1% lows +22% |
-| **Garbage collector frequency** | The garbage collector runs ~4× less often, so its ~20 ms hitch happens every ~18 s instead of every ~4 s. Uses a bit more memory. | 4× fewer GC hitches |
-| **Tracked Quests HUD compatibility** | Only with Hvizeu's *Tracked Quests HUD* mod: skips the quest HUD rebuild when no quest is pinned (it caused a 40–60 ms hitch every ~20 s for an empty HUD). | removes those hitches |
+1. Install [BepInEx 6 IL2CPP, build 788](https://builds.bepinex.dev/projects/bepinex_be/788/BepInEx-Unity.IL2CPP-win-x64-6.0.0-be.788%2B5b766a3.zip)
+   (not the regular BepInEx 5): extract it into the game folder and launch the game once.
+2. Download the [latest release](https://github.com/hoho92/Nivalis-Performance-Fix/releases/latest) and extract it
+   into the game folder, next to `Nivalis Nights.exe`.
+3. Launch the game, then **restart it once**. The thread setting is only read when the game starts.
 
-Nothing changes gameplay or saves. Every optimization can be switched off in the config.
+After a game update or a Steam file check, the mod applies the thread setting again and asks for one more restart.
 
-## Requirements
-
-- Nivalis Nights (Steam, Windows)
-- [BepInEx 6 IL2CPP, bleeding edge](https://builds.bepinex.dev/projects/bepinex_be) (tested with build 788), run the game once after installing it
-
-## Installation
-
-1. Extract the archive into the game folder (the one with `Nivalis Nights.exe`), so you get
-   `BepInEx/plugins/NivalisPerformanceFix/NivalisPerformanceFix.dll`.
-2. Start the game. The BepInEx console shows:
-   `Nivalis Performance Fix 1.0.1: 6/6 optimizations active`
-3. **The first time only**: the console asks you to **restart the game**. The job thread setting is read when the
-   engine starts, so it only applies from the next launch.
-
-After a game update or a Steam "verify files", `boot.config` is restored. The mod writes the setting again and asks
-for one more restart.
+To check it's running, the BepInEx console shows `Nivalis Performance Fix 1.0.1: 6/6 optimizations active`.
 
 ## Configuration
 
-`BepInEx/config/hoho92.nivalisperformancefix.cfg` (created at first launch):
+`BepInEx/config/hoho92.nivalisperformancefix.cfg`, created on first launch. There is a master switch, one section
+per change, and `[JobWorkers] Mode` (`Auto`, `Manual` or `Off`, where `Off` never touches the game files). The
+defaults are the settings that worked best.
 
-- `[General] Enabled`: master switch.
-- One section per optimization with `Enabled` and its settings (`[Animation]`, `[Agents]`, `[Navigation]`,
-  `[Cameras]`, `[GarbageCollector]`, `[QuestHud]`).
-- `[JobWorkers] Mode`: `Auto` (default), `Manual` (uses `Count`) or `Off` (never touches `boot.config`).
+One tip unrelated to the mod: a mouse polling at 2000 Hz or more costs FPS in this game when you turn the camera.
+1000 Hz is plenty.
 
-The defaults are the values that measured best.
+## If the game updates
 
-## Tips
-
-- **Mouse polling rate**: at 2000 Hz and above, Unity processes every mouse message on the main thread. Turning the
-  camera at 1000 Hz instead of 2000 Hz gave +6–9% FPS. 1000 Hz is plenty.
-- The Steam overlay has no measurable cost.
-
-## Compatibility
-
-- **Tracked Quests HUD** (Hvizeu): supported, see above. Load order does not matter.
-- Other mods: no known conflicts. The mod patches `Character.LateUpdateAll` (postfix),
-  `ActiveJournalEntriesUi.Refresh` (prefix, only with Tracked Quests HUD) and three call sites in the game code.
-- If the game updates and a patch no longer matches the game code, that optimization **disables itself** and the
-  console says which one: `... disabled: code signature found 0 times (game update?)`. The game keeps working;
-  check for a mod update.
+If an update changes the code the mod patches, that part turns itself off and the console names it. The game keeps
+running normally.
 
 ## Uninstall
 
-Delete `BepInEx/plugins/NivalisPerformanceFix`. To restore the original job thread setting, either set
-`[JobWorkers] Mode = Off` first and replace `Nivalis Nights_Data/boot.config` with the
-`boot.config.npf-backup` next to it, or use Steam's *Verify integrity of game files*.
+Delete `BepInEx/plugins/NivalisPerformanceFix`, then run Steam's *Verify integrity of game files* to restore the
+original thread setting.
+
+## About updates
+
+I made this for my own playthrough and I'm sharing it in case it helps. I'll keep it working while I'm playing; once
+I stop, updates may stop too. The code is MIT-licensed, so anyone is welcome to pick it up.
 
 ## For developers
 
-Developer tools are off by default (`[Developer] Enabled = true` to use them):
+The changes come from profiling the game with PIX and reading the disassembly. The mod patches
+`Character.LateUpdateAll` (postfix), `ActiveJournalEntriesUi.Refresh` (prefix, only with Tracked Quests HUD) and
+three call sites in native code, each found by byte signature.
 
-- **F8** switches the whole mod on/off; **F9** runs an automatic A/B benchmark of `BenchTarget` (stand still in a
-  busy place); **F10** measures frame times for 20 s.
-- **Play log**: one line per minute with frame-time stats and context, every hitch, and **F11** to mark a hitch you
-  felt. Written to `BepInEx/NivalisPerformanceFix.playlog.log` (local only). Summarise it with
-  `python tools/analyze_playlog.py`.
+Developer tools are off by default (`[Developer] Enabled = true`):
 
-### Building
+- **F8** toggles the whole mod, **F9** runs an A/B benchmark of `BenchTarget` (stand still somewhere busy), **F10**
+  measures frame times for 20 s.
+- A play log writes one line per minute plus every hitch to `BepInEx/NivalisPerformanceFix.playlog.log`; **F11**
+  marks a hitch you felt. `python tools/analyze_playlog.py` summarises it.
 
-Requires the .NET 6 SDK and the game with BepInEx installed and run once (for the interop assemblies).
+Building needs the .NET 6 SDK and the game with BepInEx installed and run once:
 
 ```
 dotnet build src/NivalisPerformanceFix -c Release -p:GameDir="C:\path\to\Nivalis Nights"
 ```
 
 A Release build copies the DLL into the game (`-p:InstallToGame=false` to skip). `tools/package.ps1` builds the
-release archive into `dist/`.
+release zip into `dist/`.
 
 ## License
 
