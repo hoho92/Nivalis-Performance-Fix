@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- Light probe walk limit: Unity's per-frame light probe search could loop for thousands of steps in some areas
+  (13_Stacks after arriving through a zone transition: ~40 FPS instead of ~140). Now capped per frame; lighting
+  unchanged.
+
 ## 1.0.1 — 2026-10-03
 
 - Garbage collector frequency: back to the game's value while paused and when quitting. During long pauses the

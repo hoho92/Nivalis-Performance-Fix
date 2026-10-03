@@ -41,7 +41,7 @@ internal sealed class DevTools
         benchKeyName = config.Bind(s, "BenchKey", "F9",
             "Key that starts/cancels an automatic A/B benchmark. Stand still in a busy place, don't pause.");
         benchTarget = config.Bind(s, "BenchTarget", "All",
-            "What the benchmark switches: All (whole mod) or one section name (Animation, Agents, Navigation, Cameras, GarbageCollector).");
+            "What the benchmark switches: All (whole mod) or one section name (Animation, Agents, Navigation, Cameras, LightProbes, GarbageCollector).");
         benchPhaseSeconds = config.Bind(s, "BenchPhaseSeconds", 8f, "Measured seconds per benchmark phase (after 2 s warm-up).");
         benchRounds = config.Bind(s, "BenchRounds", 3, "Rounds of on/off phases (alternating ABBA order).");
         measureKeyName = config.Bind(s, "MeasureKey", "F10", "Key that measures frame times for MeasureSeconds.");

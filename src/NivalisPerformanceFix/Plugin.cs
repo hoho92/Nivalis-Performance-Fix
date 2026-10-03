@@ -34,6 +34,7 @@ public class Plugin : BasePlugin
         new AgentThrottle(),
         new NavPathThrottle(),
         new CameraThrottle(),
+        new LightProbeWalk(),
         new GcFrequency(),
         new QuestHudCompat(),
     };
