@@ -25,7 +25,7 @@ sauvegardes ne changent pas.
   (saccades de 25 à 200 ms). Ils apparaissent maintenant sur quelques secondes.
 - **Nettoyage de la mémoire.** Le nettoyage du jeu, qui fige le jeu 50 à 100 ms, passe moins souvent et se fait
   aussi pendant les écrans de chargement des zones, où il ne se voit pas.
-- **Tracked Quests HUD.** Si tu utilises le mod *Tracked Quests HUD* de Hvizeu, une saccade qu'il provoque quand
+- **Tracked Quests HUD.** Si tu utilises le mod [Tracked Quests HUD](https://www.nexusmods.com/nivalisnights/mods/8) de Hvizeu, une saccade qu'il provoque quand
   aucune quête n'est épinglée est supprimée.
 
 Chaque changement peut être désactivé dans la config.
@@ -59,7 +59,7 @@ tournes la caméra. 1000 Hz suffit largement.
 ## Compatibilité
 
 Testé avec [Nivalis Unofficial Patch](https://www.nexusmods.com/nivalisnights/mods/14),
-[Nivalis Config Manager](https://www.nexusmods.com/nivalisnights/mods/38) et *Tracked Quests HUD* de Hvizeu : aucun
+[Nivalis Config Manager](https://www.nexusmods.com/nivalisnights/mods/38) et [Tracked Quests HUD](https://www.nexusmods.com/nivalisnights/mods/8) de Hvizeu : aucun
 conflit, rien à régler. Unofficial Patch ralentit lui aussi l'animation des personnages éloignés ; avec les deux
 installés, le réglage de ce mod prend le dessus.
 

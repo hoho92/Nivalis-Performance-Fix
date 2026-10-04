@@ -21,7 +21,7 @@ disappeared. Results depend on your CPU and where you are. Visuals, gameplay and
   25 to 200 ms). They now appear over a few seconds instead.
 - **Memory cleanup.** The game's cleanup pass, which freezes the game for 50 to 100 ms, runs less often and is also
   done during zone loading screens, where it can't be seen.
-- **Tracked Quests HUD.** If you use Hvizeu's *Tracked Quests HUD*, a hitch it causes when no quest is pinned is
+- **Tracked Quests HUD.** If you use Hvizeu's [Tracked Quests HUD](https://www.nexusmods.com/nivalisnights/mods/8), a hitch it causes when no quest is pinned is
   removed.
 
 Each one can be turned off in the config.
@@ -53,7 +53,7 @@ One tip unrelated to the mod: a mouse polling at 2000 Hz or more costs FPS in th
 ## Compatibility
 
 Tested together with [Nivalis Unofficial Patch](https://www.nexusmods.com/nivalisnights/mods/14),
-[Nivalis Config Manager](https://www.nexusmods.com/nivalisnights/mods/38) and Hvizeu's *Tracked Quests HUD*: no
+[Nivalis Config Manager](https://www.nexusmods.com/nivalisnights/mods/38) and Hvizeu's [Tracked Quests HUD](https://www.nexusmods.com/nivalisnights/mods/8): no
 conflict, nothing to configure. Unofficial Patch also slows down distant characters' animation; with both installed,
 this mod's setting takes over.
 
