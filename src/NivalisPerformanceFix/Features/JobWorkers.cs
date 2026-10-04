@@ -35,6 +35,16 @@ internal static class JobWorkers
                 new AcceptableValueList<string>("Auto", "Manual", "Off")));
         count = config.Bind("JobWorkers", "Count", 6,
             new ConfigDescription("Worker thread count used when Mode = Manual.", new AcceptableValueRange<int>(1, 32)));
+        // changed from an in-game config menu: write boot.config now, the count itself needs a restart
+        mode.SettingChanged += (_, _) => ApplyFromMenu();
+        count.SettingChanged += (_, _) => ApplyFromMenu();
+    }
+
+    private static void ApplyFromMenu()
+    {
+        Apply();
+        if (RestartNeeded) Plugin.Log.LogWarning($"{Plugin.Name}: {StatusLine}");
+        else Plugin.Log.LogInfo($"{Plugin.Name}: {StatusLine}");
     }
 
     public static int Recommended()

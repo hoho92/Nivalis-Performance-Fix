@@ -12,7 +12,7 @@ using UnityEngine.InputSystem;
 namespace NivalisPerformanceFix.Dev;
 
 /// <summary>
-/// Measurement tools used to tune the mod, off unless [Developer] Enabled = true:
+/// Measurement tools used to tune the mod, off unless [Developer] Enabled = true in hoho92.nivalisperformancefix.dev.cfg:
 ///  * ToggleKey: switch the whole mod on/off in game;
 ///  * BenchKey: automatic A/B benchmark (BenchTarget on/off, ABBA order cancels drift, 2 s warm-up per phase);
 ///  * MeasureKey: frame-time statistics over MeasureSeconds (for comparisons outside the mod);

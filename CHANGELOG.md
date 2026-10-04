@@ -1,5 +1,19 @@
 # Changelog
 
+## 1.0.4 — 2026-10-04
+
+- NPC spawn spreading (new): every in-game hour, all background NPC spawn points of a zone fired within one second
+  (frames of 25-50 ms, up to 200 ms). Their hourly appearance / removal is now spread over 5 s
+  (`[Spawns] SpreadSeconds`). Arrivals in a zone are untouched: they already happen during the loading screen.
+- Garbage collector: a full cleanup now also runs during zone loading screens (`[GarbageCollector] CollectOnLoading`,
+  ~150 ms inside a ~1.5 s loading freeze). In a 10-zone test, no GC hitch was left during play, and the managed heap
+  stayed around 800 MB instead of growing to 1.5-2 GB.
+- Compatibility: tested with Nivalis Unofficial Patch and Nivalis Config Manager; detected mods are listed at startup.
+- Works with Nivalis Config Manager (in-game settings menu, F1): every setting applies immediately, except job worker
+  threads, which are written to boot.config right away and need a game restart.
+- Developer tools moved to their own file (`hoho92.nivalisperformancefix.dev.cfg`) so they stay out of the
+  in-game menu.
+
 ## 1.0.3 — 2026-10-03
 
 - Animation LOD: after an unexpected error it now turns itself off only until the game is restarted. Before, it

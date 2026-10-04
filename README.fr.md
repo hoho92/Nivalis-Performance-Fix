@@ -21,8 +21,10 @@ sauvegardes ne changent pas.
 - **Éclairage dans certaines zones.** Corrige une recherche d'éclairage de Unity qui pouvait boucler des milliers de
   fois par image. À 13_Stacks, après y être arrivé par une transition de zone, le jeu est passé d'environ 40 à
   environ 140 FPS.
-- **Nettoyage de la mémoire.** Le nettoyage du jeu, qui provoque une petite saccade, passe environ 4 fois moins
-  souvent.
+- **Apparition des foules.** À chaque heure du jeu, les PNJ d'ambiance apparaissent tous dans la même seconde
+  (saccades de 25 à 200 ms). Ils apparaissent maintenant sur quelques secondes.
+- **Nettoyage de la mémoire.** Le nettoyage du jeu, qui fige le jeu 50 à 100 ms, passe moins souvent et se fait
+  aussi pendant les écrans de chargement des zones, où il ne se voit pas.
 - **Tracked Quests HUD.** Si tu utilises le mod *Tracked Quests HUD* de Hvizeu, une saccade qu'il provoque quand
   aucune quête n'est épinglée est supprimée.
 
@@ -40,17 +42,26 @@ Chaque changement peut être désactivé dans la config.
 Après une mise à jour du jeu ou une vérification des fichiers par Steam, le mod réapplique le réglage et redemande
 une relance.
 
-Pour vérifier que le mod tourne, la console BepInEx affiche `Nivalis Performance Fix 1.0.3: 6/6 optimizations active`
-(7/7 avec Tracked Quests HUD).
+Pour vérifier que le mod tourne, la console BepInEx affiche `Nivalis Performance Fix 1.0.4: 7/7 optimizations active`
+(8/8 avec Tracked Quests HUD).
 
 ## Configuration
 
 `BepInEx/config/hoho92.nivalisperformancefix.cfg`, créé au premier lancement. Il contient un interrupteur général,
 une section par changement, et `[JobWorkers] Mode` (`Auto`, `Manual` ou `Off` ; avec `Off`, le mod ne touche jamais
-aux fichiers du jeu). Les valeurs par défaut sont celles qui ont le mieux marché.
+aux fichiers du jeu). Les valeurs par défaut sont celles qui ont le mieux marché. Avec
+[Nivalis Config Manager](https://www.nexusmods.com/nivalisnights/mods/38), tu peux les changer en jeu (F1) ; elles
+s'appliquent tout de suite, sauf le nombre de threads, qui demande une relance.
 
 Un conseil qui n'a rien à voir avec le mod : une souris réglée à 2000 Hz ou plus coûte des FPS dans ce jeu quand tu
 tournes la caméra. 1000 Hz suffit largement.
+
+## Compatibilité
+
+Testé avec [Nivalis Unofficial Patch](https://www.nexusmods.com/nivalisnights/mods/14),
+[Nivalis Config Manager](https://www.nexusmods.com/nivalisnights/mods/38) et *Tracked Quests HUD* de Hvizeu : aucun
+conflit, rien à régler. Unofficial Patch ralentit lui aussi l'animation des personnages éloignés ; avec les deux
+installés, le réglage de ce mod prend le dessus.
 
 ## Si le jeu se met à jour
 
@@ -74,7 +85,9 @@ Les changements viennent du profilage du jeu avec PIX et de la lecture du code d
 `Character.LateUpdateAll` (postfix), `ActiveJournalEntriesUi.Refresh` (prefix, seulement avec Tracked Quests HUD) et
 trois appels dans le code natif du jeu et un dans le moteur Unity, chacun retrouvé par signature d'octets.
 
-Les outils de développement sont désactivés par défaut (`[Developer] Enabled = true`) :
+Les outils de développement sont désactivés par défaut. Ils ont leur propre fichier,
+`BepInEx/config/hoho92.nivalisperformancefix.dev.cfg` (`[Developer] Enabled = true`), pour ne pas apparaître dans les
+menus de configuration en jeu :
 
 - **F8** active ou désactive tout le mod, **F9** lance un banc A/B de `BenchTarget` (rester immobile dans un endroit
   animé), **F10** mesure les temps d'image pendant 20 s.

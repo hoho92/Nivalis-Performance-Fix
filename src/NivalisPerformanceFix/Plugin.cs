@@ -19,10 +19,17 @@ public class Plugin : BasePlugin
 {
     public const string Guid = "hoho92.nivalisperformancefix";
     public const string Name = "Nivalis Performance Fix";
-    public const string Version = "1.0.3";
+    public const string Version = "1.0.4";
 
     // prototypes this mod replaces; running both would apply some optimizations twice
     private static readonly string[] Superseded = { "hoho92.nivalis.animlod", "hoho92.nivalis.perftweaks", "hoho92.nivalis.animbatch" };
+
+    // other mods tested together with this one (2026-10-04): no conflict, only reported in the startup summary
+    private static readonly (string guid, string name)[] Compatible =
+    {
+        ("hvizeu.nivalis.unofficialpatch", "Nivalis Unofficial Patch"),
+        ("hvizeu.nivalis.trackedquestshud", "Tracked Quests HUD"),
+    };
 
     internal static new ManualLogSource Log;
     internal static Harmony Harmony;
@@ -33,6 +40,7 @@ public class Plugin : BasePlugin
         new AnimationLod(),
         new AgentThrottle(),
         new NavPathThrottle(),
+        new SpawnSpread(),
         new CameraThrottle(),
         new LightProbeWalk(),
         new GcFrequency(),
@@ -49,7 +57,10 @@ public class Plugin : BasePlugin
         JobWorkers.Bind(Config);
         foreach (Feature f in Features) f.Bind(Config);
         Dev = new DevTools(Features);
-        Dev.Bind(Config);
+        // separate file, kept only by DevTools: in-game config menus (Nivalis Config Manager) list the plugin's
+        // Config, so developer settings stay out of the players' menu
+        Dev.Bind(new ConfigFile(System.IO.Path.Combine(Paths.ConfigPath, Guid + ".dev.cfg"), true,
+            MetadataHelper.GetMetadata(this)));
 
         JobWorkers.Apply();
         foreach (Feature f in Features.Where(f => !f.InstallLate)) f.Install();
@@ -71,6 +82,8 @@ public class Plugin : BasePlugin
         Log.LogInfo("  " + JobWorkers.StatusLine);
         foreach (Feature f in Features)
             Log.LogInfo("  " + (f.Problem?.StartsWith("not needed") == true ? $"{f.Name}: {f.Problem}" : f.StatusLine));
+        foreach (var (guid, name) in Compatible.Where(c => IL2CPPChainloader.Instance.Plugins.ContainsKey(c.guid)))
+            Log.LogInfo($"  {name} detected: compatible");
         if (JobWorkers.RestartNeeded)
             Log.LogWarning($"{Name}: job worker count changed, restart the game to apply it.");
         foreach (Feature f in Features.Where(f => !f.Installed && f.Problem?.StartsWith("not needed") != true))

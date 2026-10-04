@@ -17,7 +17,10 @@ disappeared. Results depend on your CPU and where you are. Visuals, gameplay and
 - **NPC schedules and paths.** NPCs re-plan their day and re-read their path less often.
 - **Lighting in some areas.** Fixes a Unity lighting lookup that could loop thousands of times per frame. In
   13_Stacks, after arriving through a zone transition, this took the game from about 40 to about 140 FPS.
-- **Memory cleanup.** The game's cleanup pass, which causes a short hitch, runs about 4 times less often.
+- **Crowds appearing.** Every in-game hour, the game spawns its background NPCs all within one second (hitches of
+  25 to 200 ms). They now appear over a few seconds instead.
+- **Memory cleanup.** The game's cleanup pass, which freezes the game for 50 to 100 ms, runs less often and is also
+  done during zone loading screens, where it can't be seen.
 - **Tracked Quests HUD.** If you use Hvizeu's *Tracked Quests HUD*, a hitch it causes when no quest is pinned is
   removed.
 
@@ -34,17 +37,25 @@ Each one can be turned off in the config.
 
 After a game update or a Steam file check, the mod applies the thread setting again and asks for one more restart.
 
-To check it's running, the BepInEx console shows `Nivalis Performance Fix 1.0.3: 6/6 optimizations active`
-(7/7 with Tracked Quests HUD).
+To check it's running, the BepInEx console shows `Nivalis Performance Fix 1.0.4: 7/7 optimizations active`
+(8/8 with Tracked Quests HUD).
 
 ## Configuration
 
 `BepInEx/config/hoho92.nivalisperformancefix.cfg`, created on first launch. There is a master switch, one section
 per change, and `[JobWorkers] Mode` (`Auto`, `Manual` or `Off`, where `Off` never touches the game files). The
-defaults are the settings that worked best.
+defaults are the settings that worked best. With [Nivalis Config Manager](https://www.nexusmods.com/nivalisnights/mods/38)
+you can change them in game (F1); they apply right away, except the thread count, which needs a restart.
 
 One tip unrelated to the mod: a mouse polling at 2000 Hz or more costs FPS in this game when you turn the camera.
 1000 Hz is plenty.
+
+## Compatibility
+
+Tested together with [Nivalis Unofficial Patch](https://www.nexusmods.com/nivalisnights/mods/14),
+[Nivalis Config Manager](https://www.nexusmods.com/nivalisnights/mods/38) and Hvizeu's *Tracked Quests HUD*: no
+conflict, nothing to configure. Unofficial Patch also slows down distant characters' animation; with both installed,
+this mod's setting takes over.
 
 ## If the game updates
 
@@ -67,7 +78,8 @@ The changes come from profiling the game with PIX and reading the disassembly. T
 `Character.LateUpdateAll` (postfix), `ActiveJournalEntriesUi.Refresh` (prefix, only with Tracked Quests HUD) and
 three call sites in the game's native code plus one in Unity's engine, each found by byte signature.
 
-Developer tools are off by default (`[Developer] Enabled = true`):
+Developer tools are off by default. They live in their own file, `BepInEx/config/hoho92.nivalisperformancefix.dev.cfg`
+(`[Developer] Enabled = true`), so they don't show up in in-game config menus:
 
 - **F8** toggles the whole mod, **F9** runs an A/B benchmark of `BenchTarget` (stand still somewhere busy), **F10**
   measures frame times for 20 s.

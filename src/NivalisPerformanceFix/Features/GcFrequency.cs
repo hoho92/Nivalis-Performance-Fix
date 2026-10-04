@@ -1,6 +1,10 @@
+using System;
+using System.Diagnostics;
+using System.Runtime.InteropServices;
 using BepInEx.Configuration;
 using NivalisPerformanceFix.Native;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 
 namespace NivalisPerformanceFix.Features;
 
@@ -14,6 +18,9 @@ namespace NivalisPerformanceFix.Features;
 /// While the game is paused (timeScale 0) and when quitting, the game's value is restored: hitches don't matter
 /// there, and the game keeps allocating while paused (1.0.0: heap grew ~80 MB/min with no GC during a 28 min
 /// pause, followed by a hang on quit).
+/// The final stop of a cycle measured ~50 ms with a 1.3 GB heap (42% final mark, 58% finalizer table walk), so
+/// with CollectOnLoading we also run a full collection when a zone transition starts (active scene becomes the
+/// _Global / Transition loading scene, already a ~1.5 s freeze): the next in-game cycle then starts from zero.
 /// </summary>
 internal sealed unsafe class GcFrequency : Feature
 {
@@ -23,6 +30,13 @@ internal sealed unsafe class GcFrequency : Feature
         "Run the garbage collector less often: fewer GC hitches, slightly more memory used.";
 
     private ConfigEntry<int> divisor;
+    private ConfigEntry<bool> collectOnLoading;
+    private int sceneHandle;
+    private float lastCollect = -100f;
+    // a zone change shows two loading scenes in a row (_Global, then Transition_a_b): collect once
+    private const float CollectGap = 15f;
+
+    [DllImport("GameAssembly")] private static extern long il2cpp_gc_get_used_size();
 
     //   shr rcx,2; add rcx,[rip+?]; lea rax,[rcx+rdx*2]; xor edx,edx; div qword [rip+DIVISOR]; mov rcx,rax; mov r8,rax; shr rcx,1
     private const string Signature =
@@ -38,6 +52,8 @@ internal sealed unsafe class GcFrequency : Feature
         divisor = config.Bind(Section, "FreeSpaceDivisor", 1,
             new ConfigDescription("GC_free_space_divisor (game default 3). Lower = less frequent GC, more memory.",
                 new AcceptableValueRange<int>(1, 3)));
+        collectOnLoading = config.Bind(Section, "CollectOnLoading", true,
+            "Clean up memory during zone loading screens, so fewer garbage collector hitches happen in play.");
     }
 
     protected override string TryInstall()
@@ -58,6 +74,29 @@ internal sealed unsafe class GcFrequency : Feature
         if (global == null) return;
         ulong want = Active && !quitting && Time.timeScale != 0f ? (ulong)divisor.Value : vanilla;
         if (want >= 1 && *global != want) *global = want;
+
+        int handle = SceneManager.GetActiveScene().handle;
+        if (handle == sceneHandle) return;
+        sceneHandle = handle;
+        if (!Active || !collectOnLoading.Value) return;
+        string name = SceneManager.GetActiveScene().name ?? "";
+        if ((name.StartsWith("_Global", StringComparison.Ordinal) || name.StartsWith("Transition", StringComparison.Ordinal))
+            && Time.unscaledTime - lastCollect > CollectGap)
+        {
+            lastCollect = Time.unscaledTime;
+            CollectNow(name);
+        }
+    }
+
+    private static void CollectNow(string scene)
+    {
+        long before = il2cpp_gc_get_used_size();
+        var sw = Stopwatch.StartNew();
+        Il2CppSystem.GC.Collect();
+        sw.Stop();
+        long after = il2cpp_gc_get_used_size();
+        Plugin.Log.LogInfo($"GC during loading ({scene}): {sw.Elapsed.TotalMilliseconds:F0} ms, " +
+                           $"heap {before >> 20} -> {after >> 20} MB");
     }
 
     private void RestoreVanilla()
