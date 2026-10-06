@@ -5,9 +5,25 @@
 Nivalis Nights can struggle in busy places like the markets, and a powerful graphics card doesn't help much: the
 game is held back by the CPU. This BepInEx mod takes load off the CPU where you can't see the difference.
 
-In my tests, a crowded market went from about 90 to about 118 FPS, and stutters while walking around town mostly
+In my tests, a crowded market went from 99 to 122 FPS on average, and stutters while walking around town mostly
 disappeared. Menus with long lists (saves, shops) open without freezing, and the game no longer crashes when you
 quit. Results depend on your CPU and where you are. Visuals, gameplay and saves don't change.
+
+![Busy market, without and with the mod: 99 to 122 FPS on average](docs/images/compare-market.png)
+
+![Seaside Boardwalk, without and with the mod: 111 to 126 FPS on average](docs/images/compare-seaside.png)
+
+Measured on my PC with the game's Update #3. Full size: market [without](docs/images/full/market-off.jpg) /
+[with](docs/images/full/market-on.jpg), Seaside Boardwalk [without](docs/images/full/seaside-off.jpg) /
+[with](docs/images/full/seaside-on.jpg).
+
+## Menus without freezes
+
+With many saves or a big shop, the game froze every time a list opened, because it rebuilt every row at once. The
+mod builds only the rows you can see (the others as you scroll), prepares the rest in the background, and skips the
+rebuild when nothing changed. Scrolling, filters, search, sorting and buying work as before.
+
+![How long the game freezes when a menu opens, without and with the mod](docs/images/menu-freezes.png)
 
 ## What it changes
 

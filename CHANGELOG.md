@@ -2,7 +2,7 @@
 
 ## 1.0.5 — 2026-10-06
 
-For the game build of 2026-10-06.
+For the game's Update #3 (build of 2026-10-06).
 
 - Save and Load menus (new, `[SaveMenus]`): with many saves each opening froze the game. Measured with 191 saves,
   same actions without / with the mod: title-screen Load menu 1335 -> ~150 ms; in game, Save menu 1561 -> 121 ms

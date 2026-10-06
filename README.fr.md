@@ -6,10 +6,27 @@ Nivalis Nights peut ramer dans les endroits animés comme les marchés, et une g
 grand-chose : c'est le processeur qui limite le jeu. Ce mod BepInEx allège le travail du processeur là où ça ne se
 voit pas.
 
-Dans mes tests, un marché bondé est passé d'environ 90 à environ 118 FPS, et les saccades en ville ont presque
+Dans mes tests, un marché bondé est passé de 99 à 122 FPS en moyenne, et les saccades en ville ont presque
 disparu. Les menus avec de longues listes (sauvegardes, boutiques) s'ouvrent sans figer le jeu, et le jeu ne plante
 plus quand on le quitte. Les résultats dépendent de ton processeur et de l'endroit où tu es. L'affichage, le
 gameplay et les sauvegardes ne changent pas.
+
+![Marché animé, sans et avec le mod : de 99 à 122 FPS en moyenne](docs/images/compare-market.png)
+
+![Seaside Boardwalk, sans et avec le mod : de 111 à 126 FPS en moyenne](docs/images/compare-seaside.png)
+
+Mesuré sur mon PC avec la mise à jour « Update #3 » du jeu. Pleine taille : marché
+[sans](docs/images/full/market-off.jpg) / [avec](docs/images/full/market-on.jpg), Seaside Boardwalk
+[sans](docs/images/full/seaside-off.jpg) / [avec](docs/images/full/seaside-on.jpg).
+
+## Menus sans blocage
+
+Avec beaucoup de sauvegardes ou une grande boutique, le jeu se figeait à chaque ouverture de liste, parce qu'il
+reconstruisait toutes les lignes d'un coup. Le mod ne construit que les lignes visibles (les autres au fil du
+défilement), prépare le reste en arrière-plan et saute la reconstruction quand rien n'a changé. Défilement, filtres,
+recherche, tri et achats fonctionnent comme avant.
+
+![Durée du blocage à l'ouverture d'un menu, sans et avec le mod](docs/images/menu-freezes.png)
 
 ## Ce que le mod change
 
