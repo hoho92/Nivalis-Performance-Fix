@@ -89,8 +89,15 @@ tournes la caméra. 1000 Hz suffit largement.
 
 Testé avec [Nivalis Unofficial Patch](https://www.nexusmods.com/nivalisnights/mods/14),
 [Nivalis Config Manager](https://www.nexusmods.com/nivalisnights/mods/38) et [Tracked Quests HUD](https://www.nexusmods.com/nivalisnights/mods/8) de Hvizeu : aucun
-conflit, rien à régler. Unofficial Patch ralentit lui aussi l'animation des personnages éloignés ; avec les deux
-installés, le réglage de ce mod prend le dessus.
+conflit. Quand les deux sont installés, Unofficial Patch coupe ses propres options de performance qui recoupent ce mod ;
+ses correctifs restent actifs.
+
+Avec Nivalis Unofficial Patch 0.3.13, son option `[Performance] LightingRefreshCache` coûtait environ 9 % de FPS dans
+mes tests (marché animé, même endroit, plusieurs mesures). Si tu utilises les deux mods, mets-la à `false` dans
+`hvizeu.nivalis.unofficialpatch.cfg` : tous ses autres correctifs continuent de fonctionner. J'ai prévenu son auteur.
+Ce mod le rappelle aussi dans la console BepInEx au démarrage.
+
+![L'avertissement au démarrage dans la console BepInEx](docs/images/console-lighting-warning.png)
 
 ## Si le jeu se met à jour
 

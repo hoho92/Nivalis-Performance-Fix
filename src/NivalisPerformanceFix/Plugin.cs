@@ -91,6 +91,7 @@ public class Plugin : BasePlugin
             Log.LogInfo("  " + (f.Problem?.StartsWith("not needed") == true ? $"{f.Name}: {f.Problem}" : f.StatusLine));
         foreach (var (guid, name) in Compatible.Where(c => IL2CPPChainloader.Instance.Plugins.ContainsKey(c.guid)))
             Log.LogInfo($"  {name} detected: compatible");
+        WarnUnofficialPatchLighting();
         if (JobWorkers.RestartNeeded)
             Log.LogWarning($"{Name}: job worker count changed, restart the game to apply it.");
         foreach (Feature f in Features.Where(f => !f.Installed && f.Problem?.StartsWith("not needed") != true))
@@ -98,6 +99,23 @@ public class Plugin : BasePlugin
         if (superseded.Count > 0)
             Log.LogError($"{Name}: old test versions are still installed ({string.Join(", ", superseded)}). " +
                          "Remove NivalisAnimLod.dll / NivalisPerfTweaks.dll / NivalisAnimBatch.dll from BepInEx/plugins.");
+    }
+
+    /// <summary>
+    /// Nivalis Unofficial Patch 0.3.13: its LightingRefreshCache option measured -9% FPS together with this mod
+    /// (2026-10-07, busy market, 3 x 20 s per setting). Only a hint: that mod's settings are its own.
+    /// </summary>
+    private static void WarnUnofficialPatchLighting()
+    {
+        try
+        {
+            if (IL2CPPChainloader.Instance.Plugins.TryGetValue("hvizeu.nivalis.unofficialpatch", out var info) &&
+                info.Instance is BasePlugin p && p.Config.TryGetEntry("Performance", "LightingRefreshCache", out ConfigEntry<bool> e) &&
+                e.Value)
+                Log.LogWarning("Nivalis Unofficial Patch: LightingRefreshCache costs about 9% FPS with this mod (measured). " +
+                               "Set it to false in hvizeu.nivalis.unofficialpatch.cfg if you want the FPS back.");
+        }
+        catch (Exception) { } // that mod's settings changed: nothing to say
     }
 }
 

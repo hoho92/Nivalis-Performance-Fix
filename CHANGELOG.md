@@ -52,6 +52,9 @@ For the game's Update #3 (build of 2026-10-06).
 - boot.config (job worker threads) is written to a temporary file and then swapped in, never left half-written.
 - Developer tools: the A/B benchmark no longer saves its on/off phases to the config file (quitting during a
   benchmark left a feature off); dev log files are moved to `*.old` past 20 MB.
+- Nivalis Unofficial Patch 0.3.13: works together with this mod (it switches off its own overlapping performance
+  options). Its `LightingRefreshCache` option measured about -9% FPS with this mod (busy market, 3 x 20 s per
+  setting); the startup log now says so when it is on. Nothing is changed in that mod's settings.
 - Building: the game folder comes from a local `GameDir.props` (not in git) or `-p:GameDir`, see README.
 
 ## 1.0.4 — 2026-10-04

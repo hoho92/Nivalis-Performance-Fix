@@ -46,7 +46,7 @@ internal sealed class DevTools
         benchKeyName = config.Bind(s, "BenchKey", "F9",
             "Key that starts/cancels an automatic A/B benchmark. Stand still in a busy place, don't pause.");
         benchTarget = config.Bind(s, "BenchTarget", "All",
-            "What the benchmark switches: All (whole mod) or one section name (Animation, CharacterDetails, PausedCharacters, PlayerGui, LensFlares, Agents, Navigation, Spawns, Cameras, GarbageCollector).");
+            "What the benchmark switches: All (whole mod), one section name (Animation, CharacterDetails, PausedCharacters, PlayerGui, LensFlares, Agents, Navigation, Spawns, Cameras, GarbageCollector), or another mod's setting as plugin.guid:Section/Key (off = false / 0).");
         benchPhaseSeconds = config.Bind(s, "BenchPhaseSeconds", 8f, "Measured seconds per benchmark phase (after 2 s warm-up).");
         benchRounds = config.Bind(s, "BenchRounds", 3, "Rounds of on/off phases (alternating ABBA order).");
         measureKeyName = config.Bind(s, "MeasureKey", "F10", "Key that measures frame times for MeasureSeconds.");
@@ -156,8 +156,8 @@ internal sealed class DevTools
     // ---- A/B benchmark
 
     private const float Warmup = 2f;
-    private ConfigEntry<bool> benchEntry;
-    private bool benchSaved;
+    private ConfigEntryBase benchEntry;
+    private object benchSaved, benchOn, benchOff;
     private List<bool> plan;
     private int phase = -1;
     private float phaseTime;
@@ -168,12 +168,20 @@ internal sealed class DevTools
     private void StartBench()
     {
         string t = benchTarget.Value.Trim();
-        benchEntry = t.Equals("All", StringComparison.OrdinalIgnoreCase)
-            ? Plugin.MasterEnabled
+        benchEntry = t.Contains(':') ? OtherModEntry(t)
+            : t.Equals("All", StringComparison.OrdinalIgnoreCase) ? Plugin.MasterEnabled
             : features.FirstOrDefault(f => f.Enabled.Definition.Section.Equals(t, StringComparison.OrdinalIgnoreCase))?.Enabled;
         if (benchEntry == null) { Plugin.Log.LogError($"Unknown BenchTarget '{t}'"); return; }
 
-        benchSaved = benchEntry.Value;
+        benchSaved = benchEntry.BoxedValue;
+        // on = the entry's current value (true for a switch), off = false / 0
+        if (benchEntry.SettingType == typeof(bool)) { benchOn = true; benchOff = false; }
+        else
+        {
+            benchOn = benchSaved;
+            benchOff = Convert.ChangeType(0, benchEntry.SettingType);
+            if (Equals(benchOn, benchOff)) { Plugin.Log.LogError($"BenchTarget '{t}' is 0: set the value to test first"); return; }
+        }
         // the phases switch the entry in memory only: quitting during a benchmark leaves the player's config as it was
         benchEntry.ConfigFile.SaveOnConfigSet = false;
         plan = new List<bool>();
@@ -188,7 +196,25 @@ internal sealed class DevTools
     private void BeginPhase(int i)
     {
         phase = i; phaseTime = 0; phaseFrames.Clear();
-        benchEntry.Value = plan[i];
+        benchEntry.BoxedValue = plan[i] ? benchOn : benchOff;
+    }
+
+    /// <summary>
+    /// "plugin.guid:Section/Key": a bool or number setting of another installed mod (off = false / 0), e.g.
+    /// hvizeu.nivalis.unofficialpatch:Graphics/AnimationLodDistanceReduction. Only meaningful for settings that mod
+    /// reads while playing.
+    /// </summary>
+    private static ConfigEntryBase OtherModEntry(string target)
+    {
+        int colon = target.IndexOf(':'), slash = target.IndexOf('/', colon + 1);
+        if (slash < 0) return null;
+        if (!BepInEx.Unity.IL2CPP.IL2CPPChainloader.Instance.Plugins.TryGetValue(target[..colon], out var info) ||
+            info.Instance is not BepInEx.Unity.IL2CPP.BasePlugin plugin) return null;
+        var key = new ConfigDefinition(target[(colon + 1)..slash], target[(slash + 1)..]);
+        if (!plugin.Config.ContainsKey(key)) return null;
+        ConfigEntryBase entry = plugin.Config[key];
+        return entry.SettingType == typeof(bool) || entry.SettingType == typeof(float) || entry.SettingType == typeof(int)
+            ? entry : null;
     }
 
     private void BenchStep(float dt)
@@ -209,7 +235,7 @@ internal sealed class DevTools
     private void StopBench(string why)
     {
         phase = -1;
-        benchEntry.Value = benchSaved;
+        benchEntry.BoxedValue = benchSaved;
         benchEntry.ConfigFile.SaveOnConfigSet = true;
         if (why != null) { Plugin.Log.LogMessage("Benchmark " + why); return; }
         var sb = new StringBuilder($"Benchmark '{benchTarget.Value}' (job workers {Unity.Jobs.LowLevel.Unsafe.JobsUtility.JobWorkerMaximumCount}):\n");
