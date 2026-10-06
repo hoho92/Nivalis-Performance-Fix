@@ -19,7 +19,7 @@ public class Plugin : BasePlugin
 {
     public const string Guid = "hoho92.nivalisperformancefix";
     public const string Name = "Nivalis Performance Fix";
-    public const string Version = "1.0.4";
+    public const string Version = "1.0.5";
 
     // prototypes this mod replaces; running both would apply some optimizations twice
     private static readonly string[] Superseded = { "hoho92.nivalis.animlod", "hoho92.nivalis.perftweaks", "hoho92.nivalis.animbatch" };
@@ -38,11 +38,18 @@ public class Plugin : BasePlugin
     internal static readonly List<Feature> Features = new()
     {
         new AnimationLod(),
+        new CharacterDetailsLod(),
+        new PausedCharacters(),
+        new PlayerGuiLayout(),
         new AgentThrottle(),
         new NavPathThrottle(),
         new SpawnSpread(),
         new CameraThrottle(),
-        new LightProbeWalk(),
+        new LensFlareOnce(),
+        new EnumFlagsInline(),
+        new SaveMenusReuse(),
+        new ShopWindows(),
+        new ExitCrashFix(),
         new GcFrequency(),
         new QuestHudCompat(),
     };
@@ -112,7 +119,7 @@ public class PerformanceBehaviour : MonoBehaviour
         {
             if (!f.Installed) continue;
             try { f.Tick(); }
-            catch (Exception e) { Plugin.Log.LogError($"{f.Name}: {e.Message}"); }
+            catch (Exception e) { f.TickFailed(e); }
         }
         Plugin.Dev.Update();
     }

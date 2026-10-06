@@ -6,6 +6,7 @@ using System.Text;
 using BepInEx;
 using BepInEx.Configuration;
 using NivalisPerformanceFix.Features;
+using NivalisPerformanceFix.Native;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
@@ -16,18 +17,22 @@ namespace NivalisPerformanceFix.Dev;
 ///  * ToggleKey: switch the whole mod on/off in game;
 ///  * BenchKey: automatic A/B benchmark (BenchTarget on/off, ABBA order cancels drift, 2 s warm-up per phase);
 ///  * MeasureKey: frame-time statistics over MeasureSeconds (for comparisons outside the mod);
+///  * SurveyKey: one-shot inventory of the scene (see <see cref="SceneSurvey"/>);
+///  * AllocKey: which classes the game allocates the most during AllocSeconds (see <see cref="AllocTracker"/>);
+///  * TimePinKey / WeatherPinKey: pin the time of day / force a weather for comparable runs (see <see cref="WorldPin"/>);
+///  * frame split (crowd / render / rest) in the reports and the play log (see <see cref="FrameSplit"/>);
 ///  * PlayLog: frame-time stats, hitches and player marks during normal play (see <see cref="PlayLog"/>).
 /// Benchmark / measurement results go to the BepInEx log and to BepInEx/NivalisPerformanceFix.dev.log (kept across sessions).
 /// </summary>
 internal sealed class DevTools
 {
     private ConfigEntry<bool> enabled;
-    private ConfigEntry<string> toggleKeyName, benchKeyName, measureKeyName, benchTarget;
-    private ConfigEntry<float> benchPhaseSeconds, measureSeconds;
+    private ConfigEntry<string> toggleKeyName, benchKeyName, measureKeyName, surveyKeyName, allocKeyName, allocStackClasses, benchTarget;
+    private ConfigEntry<float> benchPhaseSeconds, measureSeconds, allocSeconds;
     private ConfigEntry<int> benchRounds;
 
     private readonly List<Feature> features;
-    private Key toggleKey, benchKey, measureKey;
+    private Key toggleKey, benchKey, measureKey, surveyKey, allocKey;
     private StreamWriter devLog;
     private readonly PlayLog playLog = new();
 
@@ -41,12 +46,19 @@ internal sealed class DevTools
         benchKeyName = config.Bind(s, "BenchKey", "F9",
             "Key that starts/cancels an automatic A/B benchmark. Stand still in a busy place, don't pause.");
         benchTarget = config.Bind(s, "BenchTarget", "All",
-            "What the benchmark switches: All (whole mod) or one section name (Animation, Agents, Navigation, Cameras, LightProbes, GarbageCollector).");
+            "What the benchmark switches: All (whole mod) or one section name (Animation, CharacterDetails, PausedCharacters, PlayerGui, LensFlares, Agents, Navigation, Spawns, Cameras, GarbageCollector).");
         benchPhaseSeconds = config.Bind(s, "BenchPhaseSeconds", 8f, "Measured seconds per benchmark phase (after 2 s warm-up).");
         benchRounds = config.Bind(s, "BenchRounds", 3, "Rounds of on/off phases (alternating ABBA order).");
         measureKeyName = config.Bind(s, "MeasureKey", "F10", "Key that measures frame times for MeasureSeconds.");
         measureSeconds = config.Bind(s, "MeasureSeconds", 20f, "Length of a measurement.");
+        surveyKeyName = config.Bind(s, "SurveyKey", "F12",
+            "Key that writes a one-shot inventory of the scene to BepInEx/NivalisPerformanceFix (read-only, ~1 s hitch).");
+        allocKeyName = config.Bind(s, "AllocKey", "F7", "Key that records which classes the game allocates the most.");
+        allocSeconds = config.Bind(s, "AllocSeconds", 10f, "Length of an allocation recording.");
+        allocStackClasses = config.Bind(s, "AllocStackClasses", "VenueTasks,NavMeshPath,GUILayoutGroup,IngredientProcessingType,System.String",
+            "Comma-separated class names (substrings) whose allocating code the allocation recording also reports.");
         playLog.Bind(config);
+        WorldPin.Bind(config);
     }
 
     public void Start()
@@ -55,16 +67,21 @@ internal sealed class DevTools
         Enum.TryParse(toggleKeyName.Value?.Trim(), true, out toggleKey);
         Enum.TryParse(benchKeyName.Value?.Trim(), true, out benchKey);
         Enum.TryParse(measureKeyName.Value?.Trim(), true, out measureKey);
+        Enum.TryParse(surveyKeyName.Value?.Trim(), true, out surveyKey);
+        Enum.TryParse(allocKeyName.Value?.Trim(), true, out allocKey);
+        FrameSplit.Install();
+        WorldPin.Start();
         playLog.Start();
         Plugin.Log.LogInfo($"Developer tools on: {toggleKey} toggle, {benchKey} benchmark ({benchTarget.Value}), {measureKey} measure, " +
-                           $"play log {(playLog.IsOn ? "on (F11 = mark a hitch)" : "off")}");
+                           $"{surveyKey} scene survey, {allocKey} allocations, play log {(playLog.IsOn ? "on (F11 = mark a hitch)" : "off")}");
     }
 
     public void Update()
     {
         if (!enabled.Value) return;
-        float dt = Time.unscaledDeltaTime;
+        float dt = Direct.UnscaledDeltaTime;
         Keyboard kb = Keyboard.current;
+        FrameSplit.Tick();
         playLog.Update(dt);
 
         if (Pressed(kb, toggleKey) && phase < 0)
@@ -79,13 +96,25 @@ internal sealed class DevTools
         if (Pressed(kb, measureKey) && phase < 0)
         {
             if (measureLeft >= 0) { measureLeft = -1; Plugin.Log.LogMessage("Measurement cancelled"); }
-            else { measureLeft = measureSeconds.Value; measureFrames.Clear(); Plugin.Log.LogMessage($"Measuring {measureSeconds.Value:F0} s..."); }
+            else
+            {
+                measureLeft = measureSeconds.Value; measureFrames.Clear(); measureSplit.Reset();
+                Plugin.Log.LogMessage($"Measuring {measureSeconds.Value:F0} s...");
+            }
         }
+        if (Pressed(kb, surveyKey)) SceneSurvey.Run();
+        if (Pressed(kb, allocKey)) AllocTracker.Start(allocSeconds.Value, allocStackClasses.Value, Report);
+        AllocTracker.Update(dt);
+        WorldPin.Update(kb);
         if (measureLeft >= 0) MeasureStep(dt);
         if (phase >= 0) BenchStep(dt);
     }
 
-    private static bool Pressed(Keyboard kb, Key k) => kb != null && k != Key.None && kb[k].wasPressedThisFrame;
+    /// <summary>Key pressed this frame without Ctrl / Shift / Alt: the game's own developer shortcuts use those
+    /// modifiers (Ctrl+Shift+F12 opens its dev menu, Ctrl+F9 is a dev key), so a combination never triggers our tools.</summary>
+    internal static bool Pressed(Keyboard kb, Key k) =>
+        kb != null && k != Key.None && Direct.WasPressedThisFrame(kb[k]) &&
+        !Direct.IsPressed(kb.ctrlKey) && !Direct.IsPressed(kb.shiftKey) && !Direct.IsPressed(kb.altKey);
 
     private void Report(string text)
     {
@@ -97,8 +126,7 @@ internal sealed class DevTools
     {
         try
         {
-            devLog ??= new StreamWriter(Path.Combine(Paths.BepInExRootPath, "NivalisPerformanceFix.dev.log"), true)
-                { AutoFlush = true };
+            devLog ??= DevFile.Open("NivalisPerformanceFix.dev.log");
             devLog.WriteLine($"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] {text}");
         }
         catch { }
@@ -108,10 +136,12 @@ internal sealed class DevTools
 
     private float measureLeft = -1;
     private readonly List<float> measureFrames = new(8192);
+    private readonly FrameSplit.Window measureSplit = new();
 
     private void MeasureStep(float dt)
     {
         measureFrames.Add(dt);
+        measureSplit.Add(dt);
         if ((measureLeft -= dt) > 0) return;
         measureLeft = -1;
         var (fps, low) = Stats(measureFrames);
@@ -119,7 +149,8 @@ internal sealed class DevTools
         float p99 = sorted[(int)(sorted.Count * 0.99)] * 1000, max = sorted[^1] * 1000;
         Report($"Measurement: {fps:F1} FPS avg, 1% low {low:F1}, p99 {p99:F1} ms, max {max:F1} ms, " +
                $">20 ms: {measureFrames.Count(x => x > 0.020f)}, >30 ms: {measureFrames.Count(x => x > 0.030f)} " +
-               $"({measureFrames.Count} frames, mod {(Plugin.MasterEnabled.Value ? "on" : "off")})");
+               $"({measureFrames.Count} frames, mod {(Plugin.MasterEnabled.Value ? "on" : "off")})" +
+               (measureSplit.ToString() is { Length: > 0 } split ? "\n  " + split : ""));
     }
 
     // ---- A/B benchmark
@@ -132,6 +163,7 @@ internal sealed class DevTools
     private float phaseTime;
     private readonly List<float> phaseFrames = new(4096);
     private readonly Dictionary<bool, List<(double fps, double low)>> results = new();
+    private readonly Dictionary<bool, FrameSplit.Window> splits = new();
 
     private void StartBench()
     {
@@ -142,10 +174,13 @@ internal sealed class DevTools
         if (benchEntry == null) { Plugin.Log.LogError($"Unknown BenchTarget '{t}'"); return; }
 
         benchSaved = benchEntry.Value;
+        // the phases switch the entry in memory only: quitting during a benchmark leaves the player's config as it was
+        benchEntry.ConfigFile.SaveOnConfigSet = false;
         plan = new List<bool>();
         for (int r = 0; r < Math.Max(1, benchRounds.Value); r++)
             plan.AddRange(r % 2 == 0 ? new[] { false, true } : new[] { true, false });
         results.Clear();
+        splits.Clear();
         Plugin.Log.LogMessage($"Benchmark '{t}' started: {plan.Count} phases, ~{plan.Count * (Warmup + benchPhaseSeconds.Value):F0} s. Stay still, don't pause.");
         BeginPhase(0);
     }
@@ -159,7 +194,12 @@ internal sealed class DevTools
     private void BenchStep(float dt)
     {
         phaseTime += dt;
-        if (phaseTime > Warmup) phaseFrames.Add(dt);
+        if (phaseTime > Warmup)
+        {
+            phaseFrames.Add(dt);
+            if (!splits.TryGetValue(plan[phase], out var split)) splits[plan[phase]] = split = new FrameSplit.Window();
+            split.Add(dt);
+        }
         if (phaseTime < Warmup + benchPhaseSeconds.Value) return;
         if (!results.TryGetValue(plan[phase], out var list)) results[plan[phase]] = list = new();
         list.Add(Stats(phaseFrames));
@@ -170,13 +210,15 @@ internal sealed class DevTools
     {
         phase = -1;
         benchEntry.Value = benchSaved;
+        benchEntry.ConfigFile.SaveOnConfigSet = true;
         if (why != null) { Plugin.Log.LogMessage("Benchmark " + why); return; }
         var sb = new StringBuilder($"Benchmark '{benchTarget.Value}' (job workers {Unity.Jobs.LowLevel.Unsafe.JobsUtility.JobWorkerMaximumCount}):\n");
         sb.AppendLine("  state | avg FPS | 1% low | per phase");
         foreach (bool on in new[] { false, true })
             if (results.TryGetValue(on, out var r))
                 sb.AppendLine($"  {(on ? "on " : "off")}   | {r.Average(v => v.fps),7:F1} | {r.Average(v => v.low),6:F1} | " +
-                              string.Join(" ", r.Select(v => v.fps.ToString("F1"))));
+                              string.Join(" ", r.Select(v => v.fps.ToString("F1"))) +
+                              (splits.TryGetValue(on, out var split) && split.ToString() is { Length: > 0 } text ? " | " + text : ""));
         Report(sb.ToString());
     }
 

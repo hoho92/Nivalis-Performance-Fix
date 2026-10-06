@@ -1,10 +1,13 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
+  <!-- Local game folder, not in git: GameDir.props at the repository root (see README, "Building") -->
+  <Import Project="..\..\GameDir.props" Condition="Exists('..\..\GameDir.props')" />
+
   <PropertyGroup>
     <TargetFramework>net6.0</TargetFramework>
     <AssemblyName>NivalisPerformanceFix</AssemblyName>
     <RootNamespace>NivalisPerformanceFix</RootNamespace>
-    <Version>1.0.4</Version>
+    <Version>1.0.5</Version>
     <Authors>hoho92</Authors>
     <Description>CPU performance and stutter fixes for Nivalis Nights (BepInEx IL2CPP).</Description>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
@@ -12,11 +15,15 @@
     <LangVersion>latest</LangVersion>
     <GenerateDocumentationFile>false</GenerateDocumentationFile>
     <CopyLocalLockFileAssemblies>false</CopyLocalLockFileAssemblies>
-    <!-- Game folder with BepInEx 6 (IL2CPP) installed and run once. Override: dotnet build -p:GameDir="D:\...\Nivalis Nights" -->
-    <GameDir Condition="'$(GameDir)' == ''">C:\Games\Steam\steamapps\common\Nivalis Nights</GameDir>
+    <!-- GameDir = game folder with BepInEx 6 (IL2CPP) installed and run once: from GameDir.props or -p:GameDir="..." -->
     <!-- Release builds are copied into the game; set to false to only build. -->
     <InstallToGame Condition="'$(InstallToGame)' == ''">true</InstallToGame>
   </PropertyGroup>
+
+  <Target Name="CheckGameDir" BeforeTargets="ResolveAssemblyReferences"
+          Condition="'$(GameDir)' == '' Or !Exists('$(GameDir)\BepInEx\core')">
+    <Error Text="Game folder not set or without BepInEx: create GameDir.props at the repository root (see README, Building) or pass -p:GameDir=&quot;...\Nivalis Nights&quot;." />
+  </Target>
 
   <ItemDefinitionGroup>
     <Reference><Private>false</Private></Reference>
@@ -32,6 +39,11 @@
     <Reference Include="$(GameDir)\BepInEx\interop\Assembly-CSharp.dll" />
     <Reference Include="$(GameDir)\BepInEx\interop\UnityEngine.CoreModule.dll" />
     <Reference Include="$(GameDir)\BepInEx\interop\Unity.InputSystem.dll" />
+    <Reference Include="$(GameDir)\BepInEx\interop\Assembly-CSharp-firstpass.dll" />
+    <Reference Include="$(GameDir)\BepInEx\interop\SALSA-LipSync.dll" />
+    <Reference Include="$(GameDir)\BepInEx\interop\UnityEngine.AIModule.dll" />
+    <Reference Include="$(GameDir)\BepInEx\interop\UnityEngine.UI.dll" />
+    <Reference Include="$(GameDir)\BepInEx\interop\Unity.TextMeshPro.dll" />
   </ItemGroup>
 
   <Target Name="InstallToGame" AfterTargets="Build"

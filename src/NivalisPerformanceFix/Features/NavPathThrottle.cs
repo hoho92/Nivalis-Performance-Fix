@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using BepInEx.Configuration;
 using Il2CppInterop.Runtime;
 using NivalisPerformanceFix.Native;
+using UnityEngine.AI;
 
 namespace NivalisPerformanceFix.Features;
 
@@ -13,6 +14,8 @@ namespace NivalisPerformanceFix.Features;
 /// call. We replace those two calls with a stub that re-reads each character's path every Interval frames and
 /// otherwise returns the cached count, kept in the state machine's padding bytes (+0x44..+0x47, between the
 /// corners int at +0x40 and the awaiter at +0x48): low byte = count+1 (0 = none), upper 24 bits = frame.
+/// The stub reads the path with NavMeshAgent.CopyPathTo into one shared NavMeshPath instead of the getter, which
+/// allocated a new NavMeshPath (a native path + a finalizer) per read: ~2,500 garbage objects per second in Metro Hub.
 /// Measured: +2.3% FPS, 1% lows +22%.
 /// </summary>
 internal sealed unsafe class NavPathThrottle : Feature
@@ -33,6 +36,7 @@ internal sealed unsafe class NavPathThrottle : Feature
 
     // state block: +0 int frame, +4 byte active, +8 int interval; +0x10 RUNTIME_FUNCTION, +0x20 UNWIND_INFO; code at +0x40
     private byte* state;
+    private NavMeshPath sharedPath; // kept alive by this reference; the stub uses its native object
 
     protected override void BindSettings(ConfigFile config)
     {
@@ -44,8 +48,9 @@ internal sealed unsafe class NavPathThrottle : Feature
     protected override string TryInstall()
     {
         byte* getPath = AiMethod("NavMeshAgent", "get_path", 0);
+        byte* copyPath = AiMethod("NavMeshAgent", "CopyPathTo", 1);
         byte* getCorners = AiMethod("NavMeshPath", "GetCornersNonAlloc", 1);
-        if (getPath == null || getCorners == null) return "NavMesh methods not found";
+        if (getPath == null || copyPath == null || getCorners == null) return "NavMesh methods not found";
 
         var hits = NativeCode.ScanGameAssembly(NativeCode.Pattern(Signature), p =>
             NativeCode.Rel32Target((byte*)p + GetPathCall) == getPath &&
@@ -61,6 +66,8 @@ internal sealed unsafe class NavPathThrottle : Feature
 
         state = NativeCode.AllocNear(site + PatchStart + 16, executable: true);
         if (state == null) return "no memory near GameAssembly";
+        sharedPath = new NavMeshPath();
+        ulong path = (ulong)sharedPath.Pointer;
 
         // stub(rcx = agent, rdx = corners array, r8 = state machine) -> eax = corner count
         var a = new Asm();
@@ -88,12 +95,11 @@ internal sealed unsafe class NavPathThrottle : Feature
         int prolog = a.Position - query;
         a.Emit(0x4C, 0x89, 0xC3)                            // mov rbx, r8
          .Emit(0x48, 0x89, 0x54, 0x24, 0x28)                // mov [rsp+28h], rdx
-         .Emit(0x31, 0xD2)                                  // xor edx, edx
-         .Emit(0x48, 0xB8).Imm64((ulong)getPath)            // mov rax, get_path
-         .Emit(0xFF, 0xD0)                                  // call rax
-         .Emit(0x48, 0x85, 0xC0)                            // test rax, rax
-         .Jump(0x74, "fail")                                // je fail
-         .Emit(0x48, 0x89, 0xC1)                            // mov rcx, rax
+         .Emit(0x48, 0xBA).Imm64(path)                      // mov rdx, sharedPath
+         .Emit(0x45, 0x31, 0xC0)                            // xor r8d, r8d
+         .Emit(0x48, 0xB8).Imm64((ulong)copyPath)           // mov rax, CopyPathTo
+         .Emit(0xFF, 0xD0)                                  // call rax (agent.CopyPathTo(sharedPath))
+         .Emit(0x48, 0xB9).Imm64(path)                      // mov rcx, sharedPath
          .Emit(0x48, 0x8B, 0x54, 0x24, 0x28)                // mov rdx, [rsp+28h]
          .Emit(0x45, 0x31, 0xC0)                            // xor r8d, r8d
          .Emit(0x48, 0xB8).Imm64((ulong)getCorners)         // mov rax, GetCornersNonAlloc
@@ -107,8 +113,6 @@ internal sealed unsafe class NavPathThrottle : Feature
          .Emit(0x41, 0x09, 0xCA)                            // or r10d, ecx
          .Emit(0x44, 0x89, 0x53, 0x44)                      // mov [rbx+44h], r10d
          .Jump(0xEB, "done")                                // jmp done
-         .Label("fail")
-         .Emit(0x31, 0xC0)                                  // xor eax, eax
          .Label("nocache")
          .Emit(0xC7, 0x43, 0x44).Imm32(0)                   // mov dword [rbx+44h], 0
          .Label("done")
@@ -119,7 +123,7 @@ internal sealed unsafe class NavPathThrottle : Feature
 
         byte* stub = state + 0x40;
         NativeCode.WriteStub(stub, code);
-        // get_path / GetCornersNonAlloc may throw: give the framed part unwind info
+        // CopyPathTo / GetCornersNonAlloc may throw: give the framed part unwind info
         if (!NativeCode.RegisterPushRbxFrame(state, state + 0x10, state + 0x20, 0x40 + query, 0x40 + code.Length,
                 prolog, afterPush, 0x30))
             Plugin.Log.LogWarning($"{Name}: could not register unwind info");

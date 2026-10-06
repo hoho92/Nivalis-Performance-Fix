@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using BepInEx.Configuration;
 using HarmonyLib;
 using Il2CppInterop.Runtime;
@@ -37,12 +38,7 @@ internal sealed unsafe class AnimationLod : Feature
 
     // Il2Cpp field offsets (object header included), resolved at install.
     private int offDeltaTime, offUpdateStep, offSqrDistance, offBecameVisible;
-    private IntPtr instancesField;
-
-    // HashSet<T> (Unity 2020 mscorlib), reference T: _slots @0x18, _lastIndex @0x24.
-    // Slot = { int hashCode; int next; T value; } (16 bytes), free slots have hashCode < 0. Il2CppArray data @0x20.
-    private const int HashSetSlots = 0x18, HashSetLastIndex = 0x24;
-    private const int ArrayLength = 0x18, ArrayData = 0x20, SlotSize = 16, SlotValue = 8;
+    private readonly List<IntPtr> characters = new(1024);
 
     private uint rng = 0x9E3779B9;
 
@@ -72,23 +68,16 @@ internal sealed unsafe class AnimationLod : Feature
         IntPtr baseCharacter = Il2CppClassPointerStore<BaseCharacter>.NativeClassPtr;
         if (character == IntPtr.Zero || baseCharacter == IntPtr.Zero) return "Character class not found";
 
-        instancesField = IL2CPP.GetIl2CppField(character, "instances");
-        offDeltaTime = Offset(character, "<AnimatorDeltaTime>k__BackingField");
-        offUpdateStep = Offset(character, "<AnimatorUpdateStep>k__BackingField");
-        offSqrDistance = Offset(baseCharacter, "<SqrVisibleDistance>k__BackingField");
-        offBecameVisible = Offset(baseCharacter, "becameVisible");
-        if (instancesField == IntPtr.Zero || offDeltaTime <= 0 || offUpdateStep <= 0 || offSqrDistance <= 0 || offBecameVisible <= 0)
+        offDeltaTime = CharacterSet.Offset(character, "<AnimatorDeltaTime>k__BackingField");
+        offUpdateStep = CharacterSet.Offset(character, "<AnimatorUpdateStep>k__BackingField");
+        offSqrDistance = CharacterSet.Offset(baseCharacter, "<SqrVisibleDistance>k__BackingField");
+        offBecameVisible = CharacterSet.Offset(baseCharacter, "becameVisible");
+        if (!CharacterSet.Resolve() || offDeltaTime <= 0 || offUpdateStep <= 0 || offSqrDistance <= 0 || offBecameVisible <= 0)
             return "Character fields changed (game update?)";
 
         Plugin.Harmony.Patch(AccessTools.Method(typeof(Character), nameof(Character.LateUpdateAll)),
             postfix: new HarmonyMethod(typeof(AnimationLod), nameof(LateUpdateAllPostfix)));
         return null;
-    }
-
-    private static int Offset(IntPtr klass, string field)
-    {
-        IntPtr f = IL2CPP.GetIl2CppField(klass, field);
-        return f == IntPtr.Zero ? -1 : (int)IL2CPP.il2cpp_field_get_offset(f);
     }
 
     private static void LateUpdateAllPostfix()
@@ -110,47 +99,24 @@ internal sealed unsafe class AnimationLod : Feature
     public (int total, int visible) CountCharacters()
     {
         if (!Installed) return (-1, -1);
-        IntPtr set;
-        IL2CPP.il2cpp_field_static_get_value(instancesField, &set);
-        if (set == IntPtr.Zero) return (0, 0);
-        byte* slots = *(byte**)((byte*)set + HashSetSlots);
-        int last = *(int*)((byte*)set + HashSetLastIndex);
-        if (slots == null || last <= 0 || (ulong)last > *(ulong*)(slots + ArrayLength)) return (0, 0);
-        int total = 0, visible = 0;
-        byte* slot = slots + ArrayData;
-        for (int i = 0; i < last; i++, slot += SlotSize)
-        {
-            if (*(int*)slot < 0) continue;
-            byte* c = *(byte**)(slot + SlotValue);
-            if (c == null) continue;
-            total++;
-            if (*(c + offBecameVisible) != 0) visible++;
-        }
-        return (total, visible);
+        CharacterSet.Collect(characters);
+        int visible = 0;
+        foreach (IntPtr c in characters)
+            if (*((byte*)c + offBecameVisible) != 0) visible++;
+        return (characters.Count, visible);
     }
 
     private void Apply()
     {
-        IntPtr set;
-        IL2CPP.il2cpp_field_static_get_value(instancesField, &set);
-        if (set == IntPtr.Zero) return;
-
-        byte* slots = *(byte**)((byte*)set + HashSetSlots);
-        int last = *(int*)((byte*)set + HashSetLastIndex);
-        if (slots == null || last <= 0) return;
-        if ((ulong)last > *(ulong*)(slots + ArrayLength)) return; // layout mismatch: do nothing
-
+        CharacterSet.Collect(characters);
         float near = nearDistance.Value;
         float range = Math.Max(0.01f, farDistance.Value - near);
         int maxVisible = maxVisibleStep.Value, offscreen = offscreenStep.Value;
         bool useJitter = jitter.Value;
 
-        byte* slot = slots + ArrayData;
-        for (int i = 0; i < last; i++, slot += SlotSize)
+        foreach (IntPtr ptr in characters)
         {
-            if (*(int*)slot < 0) continue;
-            byte* c = *(byte**)(slot + SlotValue);
-            if (c == null) continue;
+            byte* c = (byte*)ptr;
 
             // only characters DoLateUpdate re-armed this frame: step >= 1 and delta time just reset
             int step = *(int*)(c + offUpdateStep);

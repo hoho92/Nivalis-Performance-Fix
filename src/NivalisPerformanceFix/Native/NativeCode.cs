@@ -16,7 +16,7 @@ internal static unsafe class NativeCode
 {
     [DllImport("kernel32")] private static extern IntPtr GetModuleHandleW([MarshalAs(UnmanagedType.LPWStr)] string name);
     [DllImport("kernel32")] private static extern IntPtr VirtualAlloc(IntPtr addr, UIntPtr size, uint type, uint prot);
-    [DllImport("kernel32")] private static extern bool VirtualProtect(IntPtr addr, UIntPtr size, uint prot, out uint old);
+    [DllImport("kernel32", SetLastError = true)] private static extern bool VirtualProtect(IntPtr addr, UIntPtr size, uint prot, out uint old);
     [DllImport("kernel32")] private static extern bool FlushInstructionCache(IntPtr process, IntPtr addr, UIntPtr size);
     [DllImport("kernel32")] private static extern IntPtr GetCurrentProcess();
     [DllImport("kernel32")] private static extern bool RtlAddFunctionTable(IntPtr table, uint count, ulong baseAddress);
@@ -33,6 +33,12 @@ internal static unsafe class NativeCode
             return *(uint*)(nt + 0x50); // OptionalHeader.SizeOfImage
         }
     }
+
+    /// <summary>Base address of a loaded module (null if absent).</summary>
+    public static byte* Module(string name) => (byte*)GetModuleHandleW(name);
+
+    /// <summary>OptionalHeader.SizeOfImage of a loaded module.</summary>
+    public static uint ModuleSize(byte* module) => *(uint*)(module + *(int*)(module + 0x3C) + 0x50);
 
     public static string Rva(void* p) => $"GameAssembly+0x{(long)((byte*)p - GameAssembly):X}";
 
@@ -62,6 +68,15 @@ internal static unsafe class NativeCode
     /// <summary>Target of a rel32 call/jmp whose opcode is at <paramref name="insn"/> (E8/E9 xx xx xx xx).</summary>
     public static byte* Rel32Target(byte* insn) => insn + 5 + *(int*)(insn + 1);
 
+    [DllImport("kernel32")] private static extern IntPtr GetProcAddress(IntPtr module, [MarshalAs(UnmanagedType.LPStr)] string name);
+
+    /// <summary>Code of a GameAssembly export, following its `jmp rel32` thunk if it is one.</summary>
+    public static byte* ExportTarget(string name)
+    {
+        byte* p = (byte*)GetProcAddress((IntPtr)GameAssembly, name);
+        return p != null && *p == 0xE9 ? Rel32Target(p) : p;
+    }
+
     /// <summary>Native code pointer of an Il2Cpp method (MethodInfo.methodPointer is its first field).</summary>
     public static byte* MethodPointer(IntPtr klass, string name, int argCount)
     {
@@ -71,14 +86,15 @@ internal static unsafe class NativeCode
     }
 
     /// <summary>
-    /// One page within +-2 GB of <paramref name="near"/> (below GameAssembly), so rel32 calls and rip-relative
-    /// operands from that code can reach it. Returns null if none is free.
+    /// One page within +-2 GB of <paramref name="near"/> (below <paramref name="module"/>, GameAssembly by default),
+    /// so rel32 calls and rip-relative operands from that code can reach it. Returns null if none is free.
     /// </summary>
-    public static byte* AllocNear(byte* near, bool executable)
+    public static byte* AllocNear(byte* near, bool executable, byte* module = null)
     {
+        if (module == null) module = GameAssembly;
         for (long d = 0x1000000; d < 0x70000000; d += 0x1000000)
         {
-            byte* mem = (byte*)VirtualAlloc((IntPtr)(GameAssembly - d), (UIntPtr)4096, MemCommitReserve,
+            byte* mem = (byte*)VirtualAlloc((IntPtr)(module - d), (UIntPtr)4096, MemCommitReserve,
                 executable ? PageExecuteReadWrite : PageReadWrite);
             if (mem == null) continue;
             if (Math.Abs((long)mem - (long)near) < int.MaxValue - 0x10000) return mem;
@@ -86,10 +102,11 @@ internal static unsafe class NativeCode
         return null;
     }
 
-    /// <summary>Writes bytes into (read-only) code and flushes the instruction cache.</summary>
+    /// <summary>Writes bytes into (read-only) code and flushes the instruction cache; throws if the code cannot be made writable.</summary>
     public static void WriteCode(byte* at, byte[] bytes)
     {
-        VirtualProtect((IntPtr)at, (UIntPtr)bytes.Length, PageExecuteReadWrite, out uint old);
+        if (!VirtualProtect((IntPtr)at, (UIntPtr)bytes.Length, PageExecuteReadWrite, out uint old))
+            throw new InvalidOperationException($"code at 0x{(long)at:X} not writable (error {Marshal.GetLastWin32Error()})");
         Marshal.Copy(bytes, 0, (IntPtr)at, bytes.Length);
         VirtualProtect((IntPtr)at, (UIntPtr)bytes.Length, old, out _);
         FlushInstructionCache(GetCurrentProcess(), (IntPtr)at, (UIntPtr)bytes.Length);

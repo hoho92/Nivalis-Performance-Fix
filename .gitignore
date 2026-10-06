@@ -4,3 +4,6 @@ dist/
 *.user
 .vs/
 .idea/
+GameDir.props
+__pycache__/
+*.pyc

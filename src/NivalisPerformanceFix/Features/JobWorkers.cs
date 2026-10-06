@@ -91,7 +91,10 @@ internal static class JobWorkers
                     list.Insert(at, $"{Key}={want}");
                     lines = list.ToArray();
                 }
-                File.WriteAllText(path, string.Join(nl, lines));
+                // written beside it, then swapped in: a crash or a full disk never leaves a half-written boot.config
+                string temp = path + ".npf-tmp";
+                File.WriteAllText(temp, string.Join(nl, lines));
+                File.Replace(temp, path, null);
             }
         }
         catch (Exception e)

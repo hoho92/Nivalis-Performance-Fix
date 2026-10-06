@@ -1,63 +1,59 @@
 using BepInEx.Configuration;
+using NivalisPerformanceFix.Native;
 using UnityEngine;
 
 namespace NivalisPerformanceFix.Features;
 
 /// <summary>
-/// Two offscreen cameras do a full cull + render every frame:
-///  * MainCamera/SkyboxCamera: sky only, into a 640x360 texture;
-///  * _Footprint_Snow_Camera: snow footprints, into a 3730x4096 texture.
-/// We render them every N frames instead (the sky every 2 frames looks identical; at 30 its overlay layer visibly
-/// stuttered). Measured: +8% FPS, 1% lows +47%.
+/// The sky helper camera (MainCamera/SkyboxCamera, sky only, into a 640x360 texture) does a full cull + render
+/// every frame. We render it every N frames instead (every 2 frames looks identical; at 30 its overlay layer
+/// visibly stuttered). Measured with the former snow-footprint throttle: +8% FPS, 1% lows +47%.
+///
+/// The snow-footprint camera is left alone: since the 2026-10-06 game update, FootstepsRenderTexture.Update sets
+/// its enabled state every frame itself (off when no footprint particles, else at most once per refreshInterval),
+/// and toggling it too would fight the game (re-enabling it when it is not snowing).
+///
+/// The sky camera is only switched back on if we switched it off: when the game turns it off itself, it stays off.
+/// Feature off: the camera is given back on (if we had it off) and left alone.
 /// </summary>
 internal sealed class CameraThrottle : Feature
 {
     public override string Name => "Offscreen camera throttle";
     protected override string Section => "Cameras";
     protected override string Description =>
-        "Render the sky and snow-footprint helper cameras every few frames instead of every frame.";
+        "Render the sky helper camera every few frames instead of every frame.";
 
-    private ConfigEntry<int> skyInterval, snowInterval;
+    private ConfigEntry<int> skyInterval;
 
     // cached because a disabled camera disappears from Camera.allCameras; searched again when lost (scene change)
-    private Camera skyCam, snowCam;
+    private Camera skyCam;
     private int searchCooldown, frame;
+    private bool skippedByUs; // we switched it off for the current frame
 
     protected override void BindSettings(ConfigFile config)
     {
         skyInterval = config.Bind(Section, "SkyInterval", 2,
             new ConfigDescription("Render the sky camera every N frames (1 = every frame).",
                 new AcceptableValueRange<int>(1, 10)));
-        snowInterval = config.Bind(Section, "SnowFootprintInterval", 4,
-            new ConfigDescription("Render the snow-footprint camera every N frames (1 = every frame).",
-                new AcceptableValueRange<int>(1, 30)));
     }
 
     protected override string TryInstall() => null; // plain Unity API, nothing to locate
 
     public override void Tick()
     {
-        if ((skyCam == null || snowCam == null) && --searchCooldown <= 0)
+        if (!Direct.Alive(skyCam) && --searchCooldown <= 0)
         {
+            skyCam = null;
             searchCooldown = 60;
             foreach (Camera c in Camera.allCameras)
-            {
-                if (c == null) continue;
-                if (c.name == "SkyboxCamera") skyCam = c;
-                else if (c.name == "_Footprint_Snow_Camera") snowCam = c;
-            }
+                if (c != null && c.name == "SkyboxCamera") { skyCam = c; skippedByUs = false; break; }
         }
         frame++;
-        bool on = Active;
-        // offsets 0 / 1 so both rarely render on the same frame
-        Set(skyCam, !on || Due(skyInterval.Value, 0));
-        Set(snowCam, !on || Due(snowInterval.Value, 1));
-    }
-
-    private bool Due(int interval, int offset) => interval <= 1 || (frame + offset) % interval == 0;
-
-    private static void Set(Camera c, bool enabled)
-    {
-        if (c != null && c.enabled != enabled) c.enabled = enabled;
+        if (!Direct.Alive(skyCam)) return;
+        bool on = Direct.Enabled(skyCam);
+        if (!on && !skippedByUs) return; // the game switched it off: leave it off
+        bool want = !Active || skyInterval.Value <= 1 || frame % skyInterval.Value == 0;
+        if (on != want) skyCam.enabled = want;
+        skippedByUs = !want;
     }
 }

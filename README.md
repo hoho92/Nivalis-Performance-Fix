@@ -6,21 +6,33 @@ Nivalis Nights can struggle in busy places like the markets, and a powerful grap
 game is held back by the CPU. This BepInEx mod takes load off the CPU where you can't see the difference.
 
 In my tests, a crowded market went from about 90 to about 118 FPS, and stutters while walking around town mostly
-disappeared. Results depend on your CPU and where you are. Visuals, gameplay and saves don't change.
+disappeared. Menus with long lists (saves, shops) open without freezing, and the game no longer crashes when you
+quit. Results depend on your CPU and where you are. Visuals, gameplay and saves don't change.
 
 ## What it changes
 
 - **Worker threads.** Sets the engine's worker thread count to suit your CPU. The game's default wastes time waking
   up too many threads.
 - **Distant characters.** People far away or off-screen update their animation less often.
-- **Background cameras.** The sky and snow-footprint cameras render every few frames instead of every frame.
+- **Far character details.** Characters off-screen or far away stop turning their head toward others and stop
+  moving their lips, details nobody can see at that distance.
+- **Pause menu.** Fixes a game bug that kept re-animating every far character each frame while the game is
+  paused: about +16% FPS in the pause menu of a busy area.
+- **Background camera.** The sky helper camera renders every few frames instead of every frame.
 - **NPC schedules and paths.** NPCs re-plan their day and re-read their path less often.
-- **Lighting in some areas.** Fixes a Unity lighting lookup that could loop thousands of times per frame. In
-  13_Stacks, after arriving through a zone transition, this took the game from about 40 to about 140 FPS.
 - **Crowds appearing.** Every in-game hour, the game spawns its background NPCs all within one second (hitches of
   25 to 200 ms). They now appear over a few seconds instead.
-- **Memory cleanup.** The game's cleanup pass, which freezes the game for 50 to 100 ms, runs less often and is also
-  done during zone loading screens, where it can't be seen.
+- **Memory cleanup.** The game's cleanup pass, which freezes the game for 50 to 100 ms, runs less often.
+- **Less garbage.** Several things the game does every frame (NPC task checks, navigation paths, the keyboard
+  shortcut handler) no longer create throwaway memory, so the cleanup pass is needed less often.
+- **Lens flares.** The game checked every lens flare of the area twice per frame; once is enough.
+- **Save and Load menus.** With 191 saves, opening the Save or Load menu froze the game for 1.3 to 1.6 s (0.5 s when
+  reopening). Now about 0.1 s: only the visible saves are drawn, the rest as you scroll, and the screenshots are
+  prepared in the background.
+- **Shops.** In a shop with 127 items, the first opening froze for 0.4 s and every category change for 0.13 to
+  0.32 s. Now 0.12 s and under 0.04 s: only the visible items are drawn, and a filter click rebuilds the list once
+  instead of twice. Filters, search, sorting and buying work as before.
+- **Crash when quitting.** The game crashed every time you quit (a Unity bug, also without any mod). Fixed.
 - **Tracked Quests HUD.** If you use Hvizeu's [Tracked Quests HUD](https://www.nexusmods.com/nivalisnights/mods/8), a hitch it causes when no quest is pinned is
   removed.
 
@@ -37,8 +49,8 @@ Each one can be turned off in the config.
 
 After a game update or a Steam file check, the mod applies the thread setting again and asks for one more restart.
 
-To check it's running, the BepInEx console shows `Nivalis Performance Fix 1.0.4: 7/7 optimizations active`
-(8/8 with Tracked Quests HUD).
+To check it's running, the BepInEx console shows `Nivalis Performance Fix 1.0.5: 14/14 optimizations active`
+(15/15 with Tracked Quests HUD).
 
 ## Configuration
 
@@ -74,9 +86,12 @@ I stop, updates may stop too. The code is MIT-licensed, so anyone is welcome to 
 
 ## For developers
 
-The changes come from profiling the game with PIX and reading the disassembly. The mod patches
-`Character.LateUpdateAll` (postfix), `ActiveJournalEntriesUi.Refresh` (prefix, only with Tracked Quests HUD) and
-three call sites in the game's native code plus one in Unity's engine, each found by byte signature.
+The changes come from profiling the game with PIX and reading the disassembly. Most are Harmony patches on game
+methods (characters, NPC spawns, lens flares, the save, load and shop windows and their lists); the others rewrite a
+few spots of native code, each found by byte signature and checked before it is changed: the garbage collector's
+frequency, NPC schedule and path reads, the game's `Enum.HasFlag` calls, and one call in Unity's shutdown (the
+crash on quit). Per-frame reads of Unity values call the compiled methods directly, so the mod itself creates no
+garbage.
 
 Developer tools are off by default. They live in their own file, `BepInEx/config/hoho92.nivalisperformancefix.dev.cfg`
 (`[Developer] Enabled = true`), so they don't show up in in-game config menus:
@@ -90,6 +105,17 @@ Building needs the .NET 6 SDK and the game with BepInEx installed and run once:
 
 ```
 dotnet build src/NivalisPerformanceFix -c Release -p:GameDir="C:\path\to\Nivalis Nights"
+```
+
+To avoid passing the folder each time, create `GameDir.props` at the repository root (ignored by git; the Python
+tools read it too, or the `NIVALIS_GAME_DIR` environment variable):
+
+```xml
+<Project>
+  <PropertyGroup>
+    <GameDir Condition="'$(GameDir)' == ''">C:\path\to\Nivalis Nights</GameDir>
+  </PropertyGroup>
+</Project>
 ```
 
 A Release build copies the DLL into the game (`-p:InstallToGame=false` to skip). `tools/package.ps1` builds the

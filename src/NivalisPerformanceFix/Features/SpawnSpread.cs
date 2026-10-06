@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using BepInEx.Configuration;
 using HarmonyLib;
 using Nivalis.GhostSystem;
+using NivalisPerformanceFix.Native;
 using UnityEngine;
 
 namespace NivalisPerformanceFix.Features;
@@ -112,7 +113,7 @@ internal sealed class SpawnSpread : Feature
     public override void Tick()
     {
         if (pending.Count == 0) return;
-        float now = Time.unscaledTime;
+        float now = Direct.UnscaledTime;
         bool all = !Active; // switched off: run what is waiting now
         for (int i = 0; i < pending.Count;)
         {

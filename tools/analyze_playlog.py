@@ -7,13 +7,14 @@ screen, and every player MARK with the hitches around it.
 """
 import argparse, collections, datetime as dt, os, statistics
 
-DEFAULT = r'C:\Games\Steam\steamapps\common\Nivalis Nights\BepInEx\NivalisPerformanceFix.playlog.log'
+from gamedir import game_dir
 
 ap = argparse.ArgumentParser()
-ap.add_argument('path', nargs='?', default=DEFAULT)
+ap.add_argument('path', nargs='?', help='default: BepInEx/NivalisPerformanceFix.playlog.log in the game folder')
 ap.add_argument('--since', help='only records from this date (YYYY-MM-DD)')
 ap.add_argument('--cell', type=float, default=25.0, help='hot-spot grid size in metres')
 a = ap.parse_args()
+if not a.path: a.path = os.path.join(game_dir(), 'BepInEx', 'NivalisPerformanceFix.playlog.log')
 
 
 def parse(line):

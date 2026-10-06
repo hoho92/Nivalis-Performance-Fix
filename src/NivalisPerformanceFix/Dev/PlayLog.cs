@@ -6,6 +6,7 @@ using System.Linq;
 using BepInEx;
 using BepInEx.Configuration;
 using NivalisPerformanceFix.Features;
+using NivalisPerformanceFix.Native;
 using UnityEngine;
 using UnityEngine.InputSystem;
 using UnityEngine.SceneManagement;
@@ -19,7 +20,8 @@ namespace NivalisPerformanceFix.Dev;
 ///  * MIN   every Interval seconds: frame-time stats of that period + context;
 ///  * SPIKE every frame much slower than the recent median + context;
 ///  * MARK  when the player presses MarkKey ("I felt a hitch here") + stats of the last seconds + context.
-/// Context = scene, camera position, characters (total / on screen), managed heap, GC count, paused, mod state.
+/// Context = scene, camera position, characters (total / on screen), managed heap, previous frame's crowd / render
+/// time (see <see cref="FrameSplit"/>), paused, mod state.
 /// Costs one median update every 30 frames and one file write per record.
 /// </summary>
 internal sealed class PlayLog
@@ -61,7 +63,7 @@ internal sealed class PlayLog
     public void Update(float dt)
     {
         if (!enabled.Value) return;
-        int gc = Il2CppSystem.GC.CollectionCount(0);
+        int gc = Direct.GcCollectionCount(0);
         if (periodGcStart < 0) { periodGcStart = gc; lastGc = gc; }
         int gcDelta = gc - lastGc; lastGc = gc;
         int gcNear = gcDelta + prevGcDelta; prevGcDelta = gcDelta; // a GC finishes at the start of a frame
@@ -70,7 +72,7 @@ internal sealed class PlayLog
             Write($"SPIKE ms={Ms(dt)} median={Ms(median)} gc={(gcNear > 0 ? 1 : 0)} {Context()}");
 
         Keyboard kb = Keyboard.current;
-        if (kb != null && markKey != Key.None && kb[markKey].wasPressedThisFrame)
+        if (DevTools.Pressed(kb, markKey))
         {
             var recent = Recent(5f);
             Write($"MARK last5s_fps={Fps(recent)} last5s_max={Ms(recent.DefaultIfEmpty(0).Max())} " +
@@ -135,6 +137,7 @@ internal sealed class PlayLog
         long heapMb = -1;
         try { heapMb = il2cpp_gc_get_used_size() / (1024 * 1024); } catch { }
         return $"scene={scene} pos={pos} chars={chars} visible={visible} heap_mb={heapMb} " +
+               $"crowd_ms={F(FrameSplit.CrowdMs, "F1")} render_ms={F(FrameSplit.RenderMs, "F1")} " +
                $"paused={(Time.timeScale == 0 ? 1 : 0)} mod={(Plugin.MasterEnabled.Value ? 1 : 0)}";
     }
 
@@ -144,8 +147,7 @@ internal sealed class PlayLog
     {
         try
         {
-            file ??= new StreamWriter(Path.Combine(Paths.BepInExRootPath, "NivalisPerformanceFix.playlog.log"), true)
-                { AutoFlush = true };
+            file ??= DevFile.Open("NivalisPerformanceFix.playlog.log");
             file.WriteLine($"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {line}");
         }
         catch { }

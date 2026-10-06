@@ -58,6 +58,18 @@ internal abstract class Feature
     /// <summary>Called once per frame from the plugin behaviour (main thread).</summary>
     public virtual void Tick() { }
 
+    private int tickFailures;
+    private const int MaxTickFailures = 30;
+
+    /// <summary>Tick threw: logged once in full, then the feature is switched off for the session.</summary>
+    public void TickFailed(Exception e)
+    {
+        if (++tickFailures == 1) Plugin.Log.LogError($"{Name}: {e}");
+        if (tickFailures < MaxTickFailures) return;
+        DisableForSession($"stopped after {tickFailures} errors ({e.Message})");
+        Plugin.Log.LogError($"{Name}: switched off until the game restarts ({tickFailures} errors, last: {e.Message})");
+    }
+
     public string StatusLine =>
         !Installed ? $"{Name}: UNAVAILABLE ({Problem})"
         : !Enabled.Value ? $"{Name}: off (config)"

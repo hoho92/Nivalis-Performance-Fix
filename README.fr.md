@@ -7,24 +7,36 @@ grand-chose : c'est le processeur qui limite le jeu. Ce mod BepInEx allège le t
 voit pas.
 
 Dans mes tests, un marché bondé est passé d'environ 90 à environ 118 FPS, et les saccades en ville ont presque
-disparu. Les résultats dépendent de ton processeur et de l'endroit où tu es. L'affichage, le gameplay et les
-sauvegardes ne changent pas.
+disparu. Les menus avec de longues listes (sauvegardes, boutiques) s'ouvrent sans figer le jeu, et le jeu ne plante
+plus quand on le quitte. Les résultats dépendent de ton processeur et de l'endroit où tu es. L'affichage, le
+gameplay et les sauvegardes ne changent pas.
 
 ## Ce que le mod change
 
 - **Threads de calcul.** Règle le nombre de threads du moteur selon ton processeur. Par défaut, le jeu perd du temps
   à réveiller trop de threads.
 - **Personnages éloignés.** Les gens au loin ou hors écran mettent à jour leur animation moins souvent.
-- **Caméras d'arrière-plan.** Les caméras du ciel et des traces dans la neige font leur rendu une image sur
-  plusieurs.
+- **Détails des personnages éloignés.** Les gens hors écran ou au loin arrêtent de tourner la tête vers les autres
+  et de bouger les lèvres, des détails invisibles à cette distance.
+- **Menu pause.** Corrige un bug du jeu qui ré-animait chaque personnage éloigné à chaque image pendant la
+  pause : environ +16 % de FPS dans le menu pause d'une zone chargée.
+- **Caméra d'arrière-plan.** La caméra du ciel fait son rendu une image sur deux au lieu de chaque image.
 - **Emploi du temps et trajets des PNJ.** Les PNJ replanifient leur journée et relisent leur chemin moins souvent.
-- **Éclairage dans certaines zones.** Corrige une recherche d'éclairage de Unity qui pouvait boucler des milliers de
-  fois par image. À 13_Stacks, après y être arrivé par une transition de zone, le jeu est passé d'environ 40 à
-  environ 140 FPS.
 - **Apparition des foules.** À chaque heure du jeu, les PNJ d'ambiance apparaissent tous dans la même seconde
   (saccades de 25 à 200 ms). Ils apparaissent maintenant sur quelques secondes.
-- **Nettoyage de la mémoire.** Le nettoyage du jeu, qui fige le jeu 50 à 100 ms, passe moins souvent et se fait
-  aussi pendant les écrans de chargement des zones, où il ne se voit pas.
+- **Nettoyage de la mémoire.** Le nettoyage du jeu, qui fige le jeu 50 à 100 ms, passe moins souvent.
+- **Moins de déchets en mémoire.** Plusieurs choses que le jeu fait à chaque image (vérification des tâches des PNJ,
+  trajets, gestion des raccourcis clavier) ne créent plus de mémoire jetable, donc le nettoyage passe moins souvent.
+- **Reflets de lumière (lens flares).** Le jeu vérifiait chaque reflet de la zone deux fois par image ; une suffit.
+- **Menus Sauvegarder et Charger.** Avec 191 sauvegardes, ouvrir le menu Sauvegarder ou Charger figeait le jeu
+  1,3 à 1,6 s (0,5 s à la réouverture). Maintenant environ 0,1 s : seules les sauvegardes visibles sont affichées,
+  les autres au fil du défilement, et les images sont préparées en arrière-plan.
+- **Boutiques.** Dans une boutique de 127 objets, la première ouverture figeait le jeu 0,4 s et chaque changement de
+  catégorie 0,13 à 0,32 s. Maintenant 0,12 s et moins de 0,04 s : seuls les objets visibles sont affichés, et un
+  clic sur un filtre reconstruit la liste une fois au lieu de deux. Filtres, recherche, tri et achats fonctionnent
+  comme avant.
+- **Plantage en quittant.** Le jeu plantait à chaque fermeture (un bug d'Unity, présent aussi sans aucun mod).
+  Corrigé.
 - **Tracked Quests HUD.** Si tu utilises le mod [Tracked Quests HUD](https://www.nexusmods.com/nivalisnights/mods/8) de Hvizeu, une saccade qu'il provoque quand
   aucune quête n'est épinglée est supprimée.
 
@@ -42,8 +54,8 @@ Chaque changement peut être désactivé dans la config.
 Après une mise à jour du jeu ou une vérification des fichiers par Steam, le mod réapplique le réglage et redemande
 une relance.
 
-Pour vérifier que le mod tourne, la console BepInEx affiche `Nivalis Performance Fix 1.0.4: 7/7 optimizations active`
-(8/8 avec Tracked Quests HUD).
+Pour vérifier que le mod tourne, la console BepInEx affiche `Nivalis Performance Fix 1.0.5: 14/14 optimizations active`
+(15/15 avec Tracked Quests HUD).
 
 ## Configuration
 
@@ -81,9 +93,13 @@ le reprendre.
 
 ## Pour les développeurs
 
-Les changements viennent du profilage du jeu avec PIX et de la lecture du code désassemblé. Le mod modifie
-`Character.LateUpdateAll` (postfix), `ActiveJournalEntriesUi.Refresh` (prefix, seulement avec Tracked Quests HUD) et
-trois appels dans le code natif du jeu et un dans le moteur Unity, chacun retrouvé par signature d'octets.
+Les changements viennent du profilage du jeu avec PIX et de la lecture du code désassemblé. La plupart sont des
+patchs Harmony sur des méthodes du jeu (personnages, apparition des PNJ, reflets, fenêtres de sauvegarde, de
+chargement et de boutique et leurs listes) ; les autres réécrivent quelques endroits du code natif, chacun retrouvé
+par signature d'octets et vérifié avant d'être modifié : la fréquence du ramasse-miettes, les lectures d'emploi du
+temps et de trajet des PNJ, les appels `Enum.HasFlag` du jeu, et un appel dans l'arrêt d'Unity (le plantage en
+quittant). Les valeurs Unity lues à chaque image passent par un appel direct au code compilé, donc le mod lui-même
+ne crée pas de déchets en mémoire.
 
 Les outils de développement sont désactivés par défaut. Ils ont leur propre fichier,
 `BepInEx/config/hoho92.nivalisperformancefix.dev.cfg` (`[Developer] Enabled = true`), pour ne pas apparaître dans les
@@ -98,6 +114,17 @@ La compilation nécessite le SDK .NET 6 et le jeu avec BepInEx installé et lanc
 
 ```
 dotnet build src/NivalisPerformanceFix -c Release -p:GameDir="C:\chemin\vers\Nivalis Nights"
+```
+
+Pour ne pas répéter le dossier, créer `GameDir.props` à la racine du dépôt (ignoré par git ; les outils Python le
+lisent aussi, ou la variable d'environnement `NIVALIS_GAME_DIR`) :
+
+```xml
+<Project>
+  <PropertyGroup>
+    <GameDir Condition="'$(GameDir)' == ''">C:\chemin\vers\Nivalis Nights</GameDir>
+  </PropertyGroup>
+</Project>
 ```
 
 Une compilation Release copie la DLL dans le jeu (`-p:InstallToGame=false` pour l'éviter). `tools/package.ps1` crée
