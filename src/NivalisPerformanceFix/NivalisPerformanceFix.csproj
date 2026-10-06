@@ -15,6 +15,8 @@
     <LangVersion>latest</LangVersion>
     <GenerateDocumentationFile>false</GenerateDocumentationFile>
     <CopyLocalLockFileAssemblies>false</CopyLocalLockFileAssemblies>
+    <!-- Release DLL without debug info: no .pdb is shipped, and the DLL would otherwise carry the build machine's path -->
+    <DebugType Condition="'$(Configuration)' == 'Release'">none</DebugType>
     <!-- GameDir = game folder with BepInEx 6 (IL2CPP) installed and run once: from GameDir.props or -p:GameDir="..." -->
     <!-- Release builds are copied into the game; set to false to only build. -->
     <InstallToGame Condition="'$(InstallToGame)' == ''">true</InstallToGame>
