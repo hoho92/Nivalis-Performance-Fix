@@ -22,10 +22,13 @@ namespace NivalisPerformanceFix.Dev;
 ///  * RecordKey (Home): records the player's position and look (~20 per second) until pressed again, into
 ///    bench/routes/&lt;zone&gt;/&lt;time&gt;.json with the zone (world scene) and the save last loaded;
 ///  * PlayKey (End): replays the current zone's routes here (no save loaded), RouteRuns times; again = cancel;
+///  * PhotoKey (Insert): records a photo spot (position + look, held still for PhotoSeconds) into
+///    bench/photos/&lt;zone&gt;/&lt;time&gt;.json; a spot replays like a route and each run ends with a screenshot
+///    (bench/shots), so presentation photos and their FPS come from the same runs (request "photos");
 ///  * bench/request.json present at startup: autonomous campaign — from the title screen, loads each route's save,
 ///    pins time / weather, replays, writes bench/results/&lt;date&gt;.md + .json, renames the request *.done and
 ///    quits if asked. Request: {"routes":["all" | "zone" | "zone/name"], "runs":3, "target":"", "hour":18,
-///    "weather":"clear", "quit":true, "pix":{"run":1,"at":5,"seconds":20}}; target (BenchTarget syntax) = runs
+///    "weather":"clear", "quit":true, "pix":{"run":1,"at":5,"seconds":20}, "photos":["zone"]}; target (BenchTarget syntax) = runs
 ///    alternate off / on in ABBA order; pix = timing capture during that run (scheduled task NivalisPixCapture).
 ///    The gameplay clock is set to "hour" and paused for the whole route. "clock":{"from":6,"hours":18,"rate":60}
 ///    = clock run: no replay, the player waits at the route start while the clock advances (hitches carry the hour).
@@ -45,17 +48,27 @@ internal sealed class RouteBench
         public string Recorded { get; set; }
         /// <summary>t, x, y, z, look horizontal, look vertical.</summary>
         public List<float[]> Samples { get; set; } = new();
+        /// <summary>Photo spot: the player stays still, each run ends with a screenshot.</summary>
+        public bool Photo { get; set; }
         [System.Text.Json.Serialization.JsonIgnore] public string Name;
     }
 
     private sealed class Request
     {
         public List<string> Routes { get; set; } = new() { "all" };
+        /// <summary>Photo spots to run (bench/photos): "all", a zone or "zone/name"; put "routes":[] for photos only.</summary>
+        public List<string> Photos { get; set; } = new();
         public int Runs { get; set; } = 3;
         public string Target { get; set; } = "";
         public float Hour { get; set; } = -1;
         public string Weather { get; set; } = "";
         public bool Quit { get; set; }
+        /// <summary>"off" / "on": every run in that variant of the target (one variant per launch, e.g. an off launch
+        /// with the original boot.config, which the engine only reads at startup); "" = alternate off / on.</summary>
+        public string Only { get; set; } = "";
+        /// <summary>Gameplay clock left running (NPC schedules, crowds, restocks happen as in play); it is set back
+        /// to "hour" before every run's settle so runs stay comparable.</summary>
+        public bool Live { get; set; }
         /// <summary>Optional PIX timing capture during one run (needs the NivalisPixCapture task, tools/pixauto).</summary>
         public PixRequest Pix { get; set; }
         /// <summary>Screenshots taken after the runs of a route in their zone (bench/shots/&lt;date&gt;-&lt;name&gt;.png).</summary>
@@ -65,6 +78,8 @@ internal sealed class RouteBench
         public ClockRequest Clock { get; set; }
         /// <summary>Logs the HUD canvases (HudProbe) once, at the start of the first run.</summary>
         public bool Probe { get; set; }
+        /// <summary>Photo spots: keep the HUD in the screenshot (default: hidden for that one frame only).</summary>
+        public bool Hud { get; set; }
         /// <summary>Records LayoutLog (15 s: layout rebuilds, marks, redraws) from the start of the first run.</summary>
         public bool LayoutLog { get; set; }
         /// <summary>Object names whose components HudProbe.Inspect logs at the start of the first run.</summary>
@@ -114,6 +129,12 @@ internal sealed class RouteBench
         public List<Hitch> Hitches { get; set; }
         public string PixCapture { get; set; }
         public string Clock { get; set; }
+        /// <summary>Photo spot: the screenshot taken at the end of the run (path under bench).</summary>
+        public string Shot { get; set; }
+        /// <summary>Job worker threads of this launch (boot.config: the original file gives the engine's default).</summary>
+        public int Workers { get; set; }
+        /// <summary>Every measured frame, in ms (frame-time graphs); only in photorun.py launches ("only" set).</summary>
+        public List<float> FrameMs { get; set; }
     }
 
     /// <summary>A slow frame: when on the route, how long, where, and what the frame split says.</summary>
@@ -134,10 +155,10 @@ internal sealed class RouteBench
     };
 
     private readonly DevTools dev;
-    private ConfigEntry<string> recordKeyName, playKeyName, routeTarget;
+    private ConfigEntry<string> recordKeyName, playKeyName, photoKeyName, routeTarget;
     private ConfigEntry<int> routeRuns;
-    private ConfigEntry<float> settleSeconds;
-    private Key recordKey, playKey;
+    private ConfigEntry<float> settleSeconds, photoSeconds;
+    private Key recordKey, playKey, photoKey;
     private string folder;
     private static string lastSave;
     private string saveZone; // zone the last loaded save arrived in (a route needs a save made in its own zone)
@@ -151,6 +172,9 @@ internal sealed class RouteBench
         const string s = "RouteBench";
         recordKeyName = config.Bind(s, "RecordKey", "Home", "Key that starts / stops recording a route (position + look).");
         playKeyName = config.Bind(s, "PlayKey", "End", "Key that replays the current zone's routes (again = cancel).");
+        photoKeyName = config.Bind(s, "PhotoKey", "Insert",
+            "Key that records a photo spot here (position + look) for the automatic presentation photos.");
+        photoSeconds = config.Bind(s, "PhotoSeconds", 20f, "Measured seconds per run at a photo spot (screenshot at the end).");
         routeRuns = config.Bind(s, "Runs", 3, "Replays per route with PlayKey (rounds of off/on when Target is set).");
         routeTarget = config.Bind(s, "Target", "",
             "Empty = replay with the current settings; else what the runs switch off / on (BenchTarget syntax).");
@@ -162,6 +186,7 @@ internal sealed class RouteBench
     {
         Enum.TryParse(recordKeyName.Value?.Trim(), true, out recordKey);
         Enum.TryParse(playKeyName.Value?.Trim(), true, out playKey);
+        Enum.TryParse(photoKeyName.Value?.Trim(), true, out photoKey);
         folder = Path.Combine(Paths.BepInExRootPath, "NivalisPerformanceFix", "bench");
         ListTools.WatchLoadingScreen();
         try
@@ -171,7 +196,7 @@ internal sealed class RouteBench
                 prefix: new HarmonyMethod(typeof(RouteBench), nameof(LoadPrefix)));
         }
         catch (Exception e) { Plugin.Log.LogWarning($"RouteBench: save name not followed ({e.Message})"); }
-        Plugin.Log.LogInfo($"Route benchmark: {recordKey} record, {playKey} replay, files in BepInEx/NivalisPerformanceFix/bench");
+        Plugin.Log.LogInfo($"Route benchmark: {recordKey} record, {playKey} replay, {photoKey} photo spot, files in BepInEx/NivalisPerformanceFix/bench");
 
         string requestPath = Path.Combine(folder, "request.json");
         if (!File.Exists(requestPath)) return;
@@ -180,9 +205,9 @@ internal sealed class RouteBench
             request = JsonSerializer.Deserialize<Request>(File.ReadAllText(requestPath), json) ?? new Request();
             requestFile = requestPath;
             Application.runInBackground = true; // launched by a script: keep running without focus
-            Plugin.Log.LogMessage($"Route benchmark request found: {string.Join(", ", request.Routes)}, {request.Runs} run(s)" +
+            Plugin.Log.LogMessage($"Route benchmark request found: {string.Join(", ", request.Routes.Concat(request.Photos))}, {request.Runs} run(s)" +
                                   (request.Target.Length > 0 ? $", target {request.Target}" : ""));
-            Begin(SelectRoutes(request.Routes), fromTitle: true);
+            Begin(SelectRoutes("routes", request.Routes).Concat(SelectRoutes("photos", request.Photos)).ToList(), fromTitle: true);
         }
         catch (Exception e) { Plugin.Log.LogError($"RouteBench: bad request.json: {e.Message}"); }
     }
@@ -227,11 +252,13 @@ internal sealed class RouteBench
                 request = new Request { Runs = routeRuns.Value, Target = routeTarget.Value?.Trim() ?? "" };
                 requestFile = null;
                 if (zone == null) Plugin.Log.LogMessage("Route benchmark: not in a world zone");
-                else Begin(SelectRoutes(new List<string> { zone }), fromTitle: false);
+                else Begin(SelectRoutes("routes", new List<string> { zone }), fromTitle: false);
             }
         }
+        if (DevTools.Pressed(kb, photoKey) && step == Step.Idle) RecordPhotoSpot();
         if (wasLoading && !ListTools.Loading && saveLoading) { saveZone = Zone(); saveLoading = false; }
         wasLoading = ListTools.Loading;
+        ShowHud();
         if (step == Step.Idle) return;
         stepTime += dt;
         try { Tick(dt); }
@@ -337,9 +364,7 @@ internal sealed class RouteBench
         string zone = Zone();
         if (zone == null || Controller() is null) { Plugin.Log.LogMessage("Route recording: not in a world zone"); return; }
         recording = new Route { Zone = zone, Save = lastSave ?? "", Recorded = DateTime.Now.ToString("yyyy-MM-dd HH:mm") };
-        if (saveZone != null && !saveZone.Equals(zone, StringComparison.OrdinalIgnoreCase))
-            Plugin.Log.LogWarning($"Route recording: save '{lastSave}' arrives in {saveZone}, not {zone}: the autonomous run " +
-                                  "will skip this route (save here, load that save, then record)");
+        WarnSaveZone(zone, "route");
         recordTime = 0;
         nextSample = 0;
         Go(Step.Recording);
@@ -359,6 +384,36 @@ internal sealed class RouteBench
         recording.Samples.Add(new[] { recordTime, p.x, p.y, p.z, pov.m_HorizontalAxis.Value, pov.m_VerticalAxis.Value });
     }
 
+    private void WarnSaveZone(string zone, string what)
+    {
+        if (saveZone != null && !saveZone.Equals(zone, StringComparison.OrdinalIgnoreCase))
+            Plugin.Log.LogWarning($"Route recording: save '{lastSave}' arrives in {saveZone}, not {zone}: the autonomous run " +
+                                  $"will skip this {what} (save here, load that save, then record)");
+    }
+
+    /// <summary>A photo spot = a still route: the same position and look from 0 to PhotoSeconds.</summary>
+    private void RecordPhotoSpot()
+    {
+        string zone = Zone();
+        PlayerCharacterController c = Controller();
+        if (zone == null || c is null) { Plugin.Log.LogMessage("Photo spot: not in a world zone"); return; }
+        WarnSaveZone(zone, "photo spot");
+        Vector3 p = c.transform.position;
+        CinemachinePOV pov = c.FirstPersonPOV;
+        float h = pov is null ? 0 : pov.m_HorizontalAxis.Value, v = pov is null ? 0 : pov.m_VerticalAxis.Value;
+        var spot = new Route
+        {
+            Zone = zone, Save = lastSave ?? "", Recorded = DateTime.Now.ToString("yyyy-MM-dd HH:mm"), Photo = true,
+            Samples = { new[] { 0, p.x, p.y, p.z, h, v }, new[] { photoSeconds.Value, p.x, p.y, p.z, h, v } },
+        };
+        string dir = Path.Combine(folder, "photos", zone);
+        Directory.CreateDirectory(dir);
+        string path = Path.Combine(dir, DateTime.Now.ToString("yyyyMMdd-HHmmss") + ".json");
+        File.WriteAllText(path, JsonSerializer.Serialize(spot, json));
+        dev.Report($"Photo spot recorded -> photos/{zone}/{Path.GetFileName(path)}" +
+                   (spot.Save.Length == 0 ? " (save unknown: set \"save\" in the file)" : $" (save '{spot.Save}')"));
+    }
+
     private void StopRecording()
     {
         Go(Step.Idle);
@@ -375,10 +430,10 @@ internal sealed class RouteBench
     // ---- campaign
 
     /// <summary>"all", a zone, or "zone/name"; sorted by zone, then save (fewer loadings), then name.</summary>
-    private List<Route> SelectRoutes(List<string> wanted)
+    private List<Route> SelectRoutes(string kind, List<string> wanted)
     {
         var list = new List<Route>();
-        string root = Path.Combine(folder, "routes");
+        string root = Path.Combine(folder, kind);
         if (!Directory.Exists(root)) return list;
         foreach (string file in Directory.GetFiles(root, "*.json", SearchOption.AllDirectories))
         {
@@ -390,7 +445,7 @@ internal sealed class RouteBench
             try
             {
                 Route r = JsonSerializer.Deserialize<Route>(File.ReadAllText(file), json);
-                if (r?.Samples is { Count: >= 2 }) { r.Name = name; list.Add(r); }
+                if (r?.Samples is { Count: >= 2 }) { r.Name = (r.Photo ? "photo " : "") + name; list.Add(r); }
             }
             catch (Exception e) { Plugin.Log.LogWarning($"RouteBench: {name} unreadable: {e.Message}"); }
         }
@@ -403,6 +458,7 @@ internal sealed class RouteBench
         if (request.Clock is { } c && (c.From < 8 || c.From + c.Hours > 25)) // curfew 2h-8h: cameras, forced end of day
         { Finish("clock run outside 8h-1h (curfew from 1h warning / 2h, ends 8h)"); return; }
         queue = routes;
+        if (request.Only.Length > 0) FrameSplit.Remove(); // page numbers (photorun.py): no per-frame developer hooks
         routeIndex = -1;
         pixPending = null;
         results.Clear();
@@ -420,6 +476,7 @@ internal sealed class RouteBench
         plan = new List<bool?>();
         for (int r = 0; r < Math.Max(1, request.Runs); r++)
             if (target == null) plan.Add(null);
+            else if (request.Only is "off" or "on") plan.Add(request.Only == "on");
             else plan.AddRange(r % 2 == 0 ? new bool?[] { false, true } : new bool?[] { true, false });
         Plugin.Log.LogMessage($"Route benchmark: {routes.Count} route(s) x {plan.Count} run(s)");
         if (fromTitle) Go(Step.WaitTitle); else NextRoute();
@@ -492,6 +549,7 @@ internal sealed class RouteBench
     {
         ReleaseClock();
         SetClock();
+        if (request.Live) { Plugin.Log.LogMessage($"Route {route.Name}: gameplay clock running from {Clock()}"); return; }
         try { clockLock = TimeOfDayManager.Pause(new Il2CppSystem.Object()); }
         catch (Exception e) { Plugin.Log.LogWarning($"RouteBench: gameplay clock not paused ({e.Message})"); }
         Plugin.Log.LogMessage($"Route {route.Name}: gameplay clock paused at {Clock()}");
@@ -532,15 +590,18 @@ internal sealed class RouteBench
     private string pixPending; // capture log of a capture still running (or being written)
     private float pixWaitSeconds;
 
-    /// <summary>Keeps the player at a sample (NoClip: no gravity nor collisions on the way).</summary>
-    private static void Hold(float[] s) => Place(s, out _);
+    /// <summary>Keeps the player at a sample.</summary>
+    private void Hold(float[] s) => Place(s, out _);
 
-    private static void Place(float[] s, out float error)
+    /// <summary>A route moves in NoClip (no gravity nor collisions on the way); a photo spot stands still in the
+    /// normal state, as a player would.</summary>
+    private void Place(float[] s, out float error)
     {
         error = 0;
         PlayerCharacterController c = Controller();
         if (c is null) return;
-        if (c.State != PlayerCharacterController.ControllerState.NoClip) c.State = PlayerCharacterController.ControllerState.NoClip;
+        var state = route?.Photo == true ? PlayerCharacterController.ControllerState.Normal : PlayerCharacterController.ControllerState.NoClip;
+        if (c.State != state) c.State = state;
         var target = new Vector3(s[1], s[2], s[3]);
         Vector3 delta = target - c.transform.position;
         error = delta.magnitude;
@@ -646,16 +707,50 @@ internal sealed class RouteBench
             Hitches = new List<Hitch>(hitches),
             PixCapture = pixName,
             Clock = Clock(),
+            Shot = route.Photo ? PhotoShot() : null,
+            Workers = Unity.Jobs.LowLevel.Unsafe.JobsUtility.JobWorkerMaximumCount,
+            FrameMs = request.Only.Length > 0 ? frames.Select(x => (float)Math.Round(x * 1000, 1)).ToList() : null,
         };
         results.Add(r);
         Plugin.Log.LogMessage($"Route {r.Route} run {r.Run}/{plan.Count} ({r.Variant}): {r.AvgFps} FPS, 1% low {r.Low1}, " +
                               $"p99 {r.P99Ms} ms, max {r.MaxMs} ms, >33 ms {r.Over33}, path error max {r.PathErrorMax} m");
         if (++runIndex < plan.Count) // back to the start, short settle
         {
-            if (request.Clock != null) SetClock(); // clock run: the next run replays the same hours
+            if (request.Clock != null || request.Live) SetClock(); // the next run replays the same hours (set before its settle: the jump stays out of the measure)
             Go(Step.Settle);
         }
         else if (!StartShots()) NextRoute();
+    }
+
+    private readonly List<Canvas> hiddenHud = new();
+    private int hudHiddenFrame;
+
+    /// <summary>Screen canvases (HUD, crosshair) off for the screenshot frame only: the run is already measured.</summary>
+    private void HideHud()
+    {
+        foreach (Canvas c in UnityEngine.Object.FindObjectsOfType<Canvas>())
+            if (c.isRootCanvas && c.enabled && c.renderMode != RenderMode.WorldSpace) { c.enabled = false; hiddenHud.Add(c); }
+        hudHiddenFrame = Time.frameCount;
+    }
+
+    private void ShowHud()
+    {
+        if (hiddenHud.Count == 0 || Time.frameCount == hudHiddenFrame) return;
+        foreach (Canvas c in hiddenHud) if (c != null) c.enabled = true;
+        hiddenHud.Clear();
+    }
+
+    /// <summary>Screenshot of the photo spot as it is now (same position, after the measured seconds).</summary>
+    private string PhotoShot()
+    {
+        string variant = plan[runIndex] switch { null => "asis", true => "on", false => "off" };
+        string spot = route.Name.Substring("photo ".Length).Replace('/', '-'); // "photo zone/name" (SelectRoutes)
+        string file = $"{DateTime.Now:yyyyMMdd-HHmmss}-{spot}-{variant}-run{runIndex + 1}.png";
+        string dir = Path.Combine(folder, "shots");
+        Directory.CreateDirectory(dir);
+        if (!request.Hud) HideHud();
+        ScreenCapture.CaptureScreenshot(Path.Combine(dir, file)); // written at the end of the frame, before the next run's switch
+        return "shots/" + file;
     }
 
     /// <summary>
@@ -738,7 +833,8 @@ internal sealed class RouteBench
             foreach (var r in group)
                 sb.AppendLine($"- run {r.Run} ({r.Variant}): {r.AvgFps} FPS, 1% low {r.Low1}, p99 {r.P99Ms}, max {r.MaxMs}, " +
                               $"path error {r.PathErrorMax} m{(r.Split.Length > 0 ? ", " + r.Split : "")}" +
-                              (r.PixCapture != null ? $", PIX capture {r.PixCapture}" : "") + $", game clock {r.Clock}");
+                              (r.PixCapture != null ? $", PIX capture {r.PixCapture}" : "") + $", game clock {r.Clock}" +
+                              (r.Shot != null ? $", photo {r.Shot}" : ""));
             foreach (var r in group.Where(r => r.Hitches.Count > 0))
                 sb.AppendLine($"- run {r.Run} frames > {HitchMs:F0} ms: " + string.Join(", ", r.Hitches.Take(30).Select(h =>
                     $"t {h.T:F1} s {h.Ms:F0} ms at ({h.Pos[0]:F0} {h.Pos[1]:F0} {h.Pos[2]:F0}) crowd {h.CrowdMs:F1} render {h.RenderMs:F1}{(h.Gc ? " GC" : "")}{(h.Clock != null ? " clock " + h.Clock : "")}")) +

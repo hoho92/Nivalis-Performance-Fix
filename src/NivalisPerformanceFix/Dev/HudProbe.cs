@@ -47,7 +47,8 @@ internal static class HudProbe
         Plugin.Log.LogMessage(sb.ToString());
     }
 
-    /// <summary>Components of the first active objects named as given (with the CanvasGroup alpha above them).</summary>
+    /// <summary>Components of the first active objects named as given (with the CanvasGroup alpha above them);
+    /// "text:WORDS" = the active texts showing WORDS, with the texts next to them.</summary>
     internal static void Inspect(System.Collections.Generic.IEnumerable<string> names)
     {
         var sb = new StringBuilder("HUD probe: inspect\n");
@@ -55,9 +56,18 @@ internal static class HudProbe
         foreach (string name in names)
         {
             int shown = 0;
+            string words = name.StartsWith("text:") ? name.Substring(5) : null;
             foreach (Transform t in all)
             {
-                if (t.name != name || !t.gameObject.activeInHierarchy || ++shown > 2) continue;
+                if (words != null)
+                {
+                    if (!t.gameObject.activeInHierarchy || t.GetComponent<TMPro.TMP_Text>() is not { } tx || tx == null ||
+                        tx.text?.Contains(words) != true || ++shown > 4) continue;
+                    Transform box = t.parent?.parent ?? t;
+                    foreach (TMPro.TMP_Text near in box.GetComponentsInChildren<TMPro.TMP_Text>(true))
+                        sb.AppendLine($"  text {Path(near.transform)} (active {near.gameObject.activeInHierarchy}): \"{near.text}\"");
+                }
+                else if (t.name != name || !t.gameObject.activeInHierarchy || ++shown > 2) continue;
                 float alpha = 1;
                 for (Transform q = t; q is not null; q = q.parent)
                     if (q.GetComponent<CanvasGroup>() is { } g && g != null) alpha *= g.alpha;

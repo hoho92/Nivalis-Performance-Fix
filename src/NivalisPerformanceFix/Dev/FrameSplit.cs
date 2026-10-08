@@ -67,6 +67,16 @@ internal static class FrameSplit
         }
     }
 
+    /// <summary>Removes the hooks (photo runs: their numbers go on the Nexus page, no developer cost in them).</summary>
+    internal static void Remove()
+    {
+        if (hooks == null) return;
+        hooks.UnpatchSelf();
+        hooks = null;
+        CrowdMs = RenderMs = crowdAcc = renderAcc = 0;
+        Plugin.Log.LogInfo("Frame split hooks removed for this launch");
+    }
+
     private static MethodInfo Method(Type t, string name) =>
         AccessTools.DeclaredMethod(t, name) ?? throw new MissingMethodException(t.Name + "." + name);
 
