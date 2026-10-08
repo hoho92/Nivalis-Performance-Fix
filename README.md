@@ -9,9 +9,9 @@ In my tests, a crowded market went from 99 to 122 FPS on average, and stutters w
 disappeared. Menus with long lists (saves, shops) open without freezing, and the game no longer crashes when you
 quit. Results depend on your CPU and where you are. Visuals, gameplay and saves don't change.
 
-![Busy market, without and with the mod: 99 to 122 FPS on average](docs/images/compare-market.png)
+![Busy market, without and with the mod: 99 to 122 FPS on average](docs/images/compare-market.jpg)
 
-![Seaside Boardwalk, without and with the mod: 111 to 126 FPS on average](docs/images/compare-seaside.png)
+![Seaside Boardwalk, without and with the mod: 111 to 126 FPS on average](docs/images/compare-seaside.jpg)
 
 Measured on my PC with the game's Update #3. Full size: market [without](docs/images/full/market-off.jpg) /
 [with](docs/images/full/market-on.jpg), Seaside Boardwalk [without](docs/images/full/seaside-off.jpg) /
@@ -19,11 +19,12 @@ Measured on my PC with the game's Update #3. Full size: market [without](docs/im
 
 ## Menus without freezes
 
-With many saves or a big shop, the game froze every time a list opened, because it rebuilt every row at once. The
-mod builds only the rows you can see (the others as you scroll), prepares the rest in the background, and skips the
-rebuild when nothing changed. Scrolling, filters, search, sorting and buying work as before.
+With many saves, a big shop, many contacts or reviews, the game froze every time a list opened, because it rebuilt
+every row at once. The mod builds only the rows you can see (the others as you scroll), prepares the rest during
+loading screens and pauses, and skips the rebuild when nothing changed. Scrolling, filters, search, sorting, buying
+and the gamepad work as before.
 
-![How long the game freezes when a menu opens, without and with the mod](docs/images/menu-freezes.png)
+![How long the game freezes when a menu opens, without and with the mod](docs/images/menu-freezes-v3.jpg)
 
 ## What it changes
 
@@ -48,9 +49,24 @@ rebuild when nothing changed. Scrolling, filters, search, sorting and buying wor
 - **Shops.** In a shop with 127 items, the first opening froze for 0.4 s and every category change for 0.13 to
   0.32 s. Now 0.12 s and under 0.04 s: only the visible items are drawn, and a filter click rebuilds the list once
   instead of twice. Filters, search, sorting and buying work as before.
+- **In-game menu.** Contacts, journal and bag open two to four times faster (contacts: 133 to 53 ms the first time,
+  112 to 28 ms after), the "Staff" contacts filter went from 0.3 s to 14 ms, and the menu closes faster.
+- **Business reviews.** With a thousand reviews, the Reviews tab opens in 0.1 s instead of 0.3 s, and changing the
+  period no longer freezes for up to 1.9 s.
+- **Fish database, recipes, scrollbars.** The fish database keeps its rows between openings, the recipe details no
+  longer flicker off and on, and scrollbars no longer lay their list out several times.
+- **Dialogues.** The voice of the next lines is loaded in advance: no more 12-40 ms freeze at each line.
+- **Smoke and steam.** Effects coming back into view no longer replay the time they were hidden in one frame (hitches
+  of 50-65 ms when turning the camera).
+- **Shops restocking.** A few times per in-game day, vendors update their stock: that hitch went from 98 to 34 ms by
+  skipping a check whose result the game never uses.
+- **HUD.** The compass letters and the opening hours are no longer redrawn every frame.
+- **Loading.** Textures upload faster during loading screens: the title screen shows up about 1 s earlier.
 - **Crash when quitting.** The game crashed every time you quit (a Unity bug, also without any mod). Fixed.
-- **Tracked Quests HUD.** If you use Hvizeu's [Tracked Quests HUD](https://www.nexusmods.com/nivalisnights/mods/8), a hitch it causes when no quest is pinned is
-  removed.
+- **Stuck NPCs.** An NPC that spawned off the walkable area never moved again (and filled the log with warnings). It
+  is now put back on its way.
+- **Tracked Quests HUD 1.0.** If you use Hvizeu's [Tracked Quests HUD](https://www.nexusmods.com/nivalisnights/mods/8)
+  1.0, a hitch it causes when no quest is pinned is removed. Version 1.1 and later fix it themselves.
 
 Each one can be turned off in the config.
 
@@ -65,8 +81,8 @@ Each one can be turned off in the config.
 
 After a game update or a Steam file check, the mod applies the thread setting again and asks for one more restart.
 
-To check it's running, the BepInEx console shows `Nivalis Performance Fix 1.0.5: 14/14 optimizations active`
-(15/15 with Tracked Quests HUD).
+To check it's running, the BepInEx console shows `Nivalis Performance Fix 1.0.6: 27/27 optimizations active`
+(28/28 with Tracked Quests HUD 1.0).
 
 ## Configuration
 
@@ -80,9 +96,9 @@ One tip unrelated to the mod: a mouse polling at 2000 Hz or more costs FPS in th
 
 ## Compatibility
 
-Tested together with [Nivalis Unofficial Patch](https://www.nexusmods.com/nivalisnights/mods/14),
-[Nivalis Config Manager](https://www.nexusmods.com/nivalisnights/mods/38) and Hvizeu's [Tracked Quests HUD](https://www.nexusmods.com/nivalisnights/mods/8): no
-conflict. When both are installed, Unofficial Patch switches off its own performance options that overlap this mod;
+Tested together with [Nivalis Unofficial Patch](https://www.nexusmods.com/nivalisnights/mods/14) 0.3.13,
+[Nivalis Config Manager](https://www.nexusmods.com/nivalisnights/mods/38) and Hvizeu's [Tracked Quests HUD](https://www.nexusmods.com/nivalisnights/mods/8) 1.1.10: no
+conflict (automated menu tests with and without each of them, including Unofficial Patch's shop filters and sorting). When both are installed, Unofficial Patch switches off its own performance options that overlap this mod;
 its fixes keep working.
 
 With Nivalis Unofficial Patch 0.3.13, its `[Performance] LightingRefreshCache` option cost about 9% FPS in my tests
@@ -110,10 +126,10 @@ I stop, updates may stop too. The code is MIT-licensed, so anyone is welcome to 
 ## For developers
 
 The changes come from profiling the game with PIX and reading the disassembly. Most are Harmony patches on game
-methods (characters, NPC spawns, lens flares, the save, load and shop windows and their lists); the others rewrite a
-few spots of native code, each found by byte signature and checked before it is changed: the garbage collector's
-frequency, NPC schedule and path reads, the game's `Enum.HasFlag` calls, and one call in Unity's shutdown (the
-crash on quit). Per-frame reads of Unity values call the compiled methods directly, so the mod itself creates no
+methods (characters, NPC spawns, lens flares, dialogue voices, particles, the HUD, the menus and their lists); the
+others rewrite a few spots of native code, each found by byte signature and checked before it is changed: the garbage
+collector's frequency, NPC schedule and path reads, the game's `Enum.HasFlag` calls, the vendor stock check, and one
+call in Unity's shutdown (the crash on quit). Per-frame reads of Unity values call the compiled methods directly, so the mod itself creates no
 garbage.
 
 Developer tools are off by default. They live in their own file, `BepInEx/config/hoho92.nivalisperformancefix.dev.cfg`
@@ -123,6 +139,10 @@ Developer tools are off by default. They live in their own file, `BepInEx/config
   measures frame times for 20 s.
 - A play log writes one line per minute plus every hitch to `BepInEx/NivalisPerformanceFix.playlog.log`; **F11**
   marks a hitch you felt. `python tools/analyze_playlog.py` summarises it.
+- Automated tests driven by `BepInEx/NivalisPerformanceFix/bench/*.json` requests: a route benchmark (record a walk
+  with **Home**, replay it with **End**) and a UI test that loads a save, opens windows, clicks, scrolls, navigates
+  with a simulated gamepad, takes screenshots and checks their content. `tools/uicompare.py` and
+  `tools/monkeycompare.py` compare two runs (mod off / on).
 
 Building needs the .NET 6 SDK and the game with BepInEx installed and run once:
 

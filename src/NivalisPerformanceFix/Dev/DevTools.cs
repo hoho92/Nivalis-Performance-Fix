@@ -19,14 +19,18 @@ namespace NivalisPerformanceFix.Dev;
 ///  * MeasureKey: frame-time statistics over MeasureSeconds (for comparisons outside the mod);
 ///  * SurveyKey: one-shot inventory of the scene (see <see cref="SceneSurvey"/>);
 ///  * AllocKey: which classes the game allocates the most during AllocSeconds (see <see cref="AllocTracker"/>);
+///  * F4: cost of one pause menu fade step, with and without the hidden save rows (see <see cref="FadeProbe"/>);
+///  * F6: UI layout work for 15 s, by element (see <see cref="LayoutLog"/>);
+///  * panel log (PanelLog = true): every UI panel shown / hidden, with its Selectables (see <see cref="PanelLog"/>);
 ///  * TimePinKey / WeatherPinKey: pin the time of day / force a weather for comparable runs (see <see cref="WorldPin"/>);
 ///  * frame split (crowd / render / rest) in the reports and the play log (see <see cref="FrameSplit"/>);
+///  * agent probe: NPCs whose NavMeshAgent is enabled off the NavMesh (see <see cref="AgentProbe"/>);
 ///  * PlayLog: frame-time stats, hitches and player marks during normal play (see <see cref="PlayLog"/>).
 /// Benchmark / measurement results go to the BepInEx log and to BepInEx/NivalisPerformanceFix.dev.log (kept across sessions).
 /// </summary>
 internal sealed class DevTools
 {
-    private ConfigEntry<bool> enabled;
+    private ConfigEntry<bool> enabled, panelLog;
     private ConfigEntry<string> toggleKeyName, benchKeyName, measureKeyName, surveyKeyName, allocKeyName, allocStackClasses, benchTarget;
     private ConfigEntry<float> benchPhaseSeconds, measureSeconds, allocSeconds;
     private ConfigEntry<int> benchRounds;
@@ -35,6 +39,8 @@ internal sealed class DevTools
     private Key toggleKey, benchKey, measureKey, surveyKey, allocKey;
     private StreamWriter devLog;
     private readonly PlayLog playLog = new();
+    private RouteBench routeBench;
+    private UiBench uiBench;
 
     public DevTools(List<Feature> features) => this.features = features;
 
@@ -57,13 +63,23 @@ internal sealed class DevTools
         allocSeconds = config.Bind(s, "AllocSeconds", 10f, "Length of an allocation recording.");
         allocStackClasses = config.Bind(s, "AllocStackClasses", "VenueTasks,NavMeshPath,GUILayoutGroup,IngredientProcessingType,System.String",
             "Comma-separated class names (substrings) whose allocating code the allocation recording also reports.");
+        panelLog = config.Bind(s, "PanelLog", false,
+            "Log every UI panel shown / hidden with its Selectables. Counting them costs ms on panels with long lists " +
+            "(venue window with ~1000 prebuilt review rows: +20 ms per close, UI test 2026-10-08): off for measurements.");
         playLog.Bind(config);
         WorldPin.Bind(config);
+        routeBench = new RouteBench(this);
+        routeBench.Bind(config);
+        uiBench = new UiBench(this);
     }
 
     public void Start()
     {
-        if (!enabled.Value) return;
+        if (!enabled.Value)
+        {
+            BootLog.Stop(); // the launch timeline is for developers only
+            return;
+        }
         Enum.TryParse(toggleKeyName.Value?.Trim(), true, out toggleKey);
         Enum.TryParse(benchKeyName.Value?.Trim(), true, out benchKey);
         Enum.TryParse(measureKeyName.Value?.Trim(), true, out measureKey);
@@ -71,9 +87,13 @@ internal sealed class DevTools
         Enum.TryParse(allocKeyName.Value?.Trim(), true, out allocKey);
         FrameSplit.Install();
         WorldPin.Start();
+        if (panelLog.Value) PanelLog.Start();
         playLog.Start();
+        routeBench.Start();
+        uiBench.Start();
+        AgentProbe.Start();
         Plugin.Log.LogInfo($"Developer tools on: {toggleKey} toggle, {benchKey} benchmark ({benchTarget.Value}), {measureKey} measure, " +
-                           $"{surveyKey} scene survey, {allocKey} allocations, play log {(playLog.IsOn ? "on (F11 = mark a hitch)" : "off")}");
+                           $"{surveyKey} scene survey, {allocKey} allocations, F4 fade probe, F6 layout log, play log {(playLog.IsOn ? "on (F11 = mark a hitch)" : "off")}");
     }
 
     public void Update()
@@ -103,9 +123,15 @@ internal sealed class DevTools
             }
         }
         if (Pressed(kb, surveyKey)) SceneSurvey.Run();
+        if (Pressed(kb, Key.F4)) FadeProbe.Run();
+        if (Pressed(kb, Key.F6)) LayoutLog.Toggle();
+        LayoutLog.Update();
         if (Pressed(kb, allocKey)) AllocTracker.Start(allocSeconds.Value, allocStackClasses.Value, Report);
         AllocTracker.Update(dt);
         WorldPin.Update(kb);
+        routeBench.Update(kb, dt);
+        uiBench.Update(dt);
+        AgentProbe.Update();
         if (measureLeft >= 0) MeasureStep(dt);
         if (phase >= 0) BenchStep(dt);
     }
@@ -116,7 +142,7 @@ internal sealed class DevTools
         kb != null && k != Key.None && Direct.WasPressedThisFrame(kb[k]) &&
         !Direct.IsPressed(kb.ctrlKey) && !Direct.IsPressed(kb.shiftKey) && !Direct.IsPressed(kb.altKey);
 
-    private void Report(string text)
+    internal void Report(string text)
     {
         Plugin.Log.LogMessage(text);
         Write(text);
@@ -168,9 +194,7 @@ internal sealed class DevTools
     private void StartBench()
     {
         string t = benchTarget.Value.Trim();
-        benchEntry = t.Contains(':') ? OtherModEntry(t)
-            : t.Equals("All", StringComparison.OrdinalIgnoreCase) ? Plugin.MasterEnabled
-            : features.FirstOrDefault(f => f.Enabled.Definition.Section.Equals(t, StringComparison.OrdinalIgnoreCase))?.Enabled;
+        benchEntry = FindTarget(t);
         if (benchEntry == null) { Plugin.Log.LogError($"Unknown BenchTarget '{t}'"); return; }
 
         benchSaved = benchEntry.BoxedValue;
@@ -198,6 +222,12 @@ internal sealed class DevTools
         phase = i; phaseTime = 0; phaseFrames.Clear();
         benchEntry.BoxedValue = plan[i] ? benchOn : benchOff;
     }
+
+    /// <summary>The setting a benchmark switches (BenchTarget syntax), null if unknown.</summary>
+    internal ConfigEntryBase FindTarget(string t) =>
+        t.Contains(':') ? OtherModEntry(t)
+        : t.Equals("All", StringComparison.OrdinalIgnoreCase) ? Plugin.MasterEnabled
+        : features.FirstOrDefault(f => f.Enabled.Definition.Section.Equals(t, StringComparison.OrdinalIgnoreCase))?.Enabled;
 
     /// <summary>
     /// "plugin.guid:Section/Key": a bool or number setting of another installed mod (off = false / 0), e.g.
@@ -248,7 +278,7 @@ internal sealed class DevTools
         Report(sb.ToString());
     }
 
-    private static (double fps, double low) Stats(List<float> dts)
+    internal static (double fps, double low) Stats(List<float> dts)
     {
         if (dts.Count == 0) return (0, 0);
         double sum = 0; foreach (float d in dts) sum += d;

@@ -53,7 +53,16 @@ internal abstract class Feature
     {
         Problem = reason;
         Installed = false;
+        // its Tick stops now: whatever Tick puts back when the feature is switched off is put back here
+        try { SwitchedOff(); }
+        catch (Exception e) { Plugin.Log.LogWarning($"{Name}: not fully restored ({e.Message})"); }
     }
+
+    /// <summary>
+    /// The feature is switched off for the session (Tick no longer runs): undo what it changed in the game, as its
+    /// Tick does when the feature is switched off in the config.
+    /// </summary>
+    protected virtual void SwitchedOff() { }
 
     /// <summary>Called once per frame from the plugin behaviour (main thread).</summary>
     public virtual void Tick() { }

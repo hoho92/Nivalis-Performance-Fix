@@ -95,6 +95,24 @@ internal static class WorldPin
         }
     }
 
+    /// <summary>Pins from code (route benchmark): hour &lt; 0 = time left to the game, weather "" = left to the game,
+    /// else clear / rain / snow / blizzard. Returns false for an unknown weather name.</summary>
+    internal static bool Pin(float hour, string weather)
+    {
+        timePinned = hour >= 0;
+        pinnedTime = Mathf.Clamp01(hour / 24f);
+        weatherStep = string.IsNullOrWhiteSpace(weather) ? -1 : Array.IndexOf(weatherNames, weather.Trim().ToLowerInvariant());
+        ApplyWeather();
+        return string.IsNullOrWhiteSpace(weather) || weatherStep >= 0;
+    }
+
+    /// <summary>Releases both pins: the game resumes control.</summary>
+    internal static void Release()
+    {
+        timePinned = false;
+        weatherStep = -1;
+    }
+
     /// <summary>Runs before LightCycleManager.Update: the frame computes its output with the pinned time.</summary>
     private static void TimePinPrefix()
     {

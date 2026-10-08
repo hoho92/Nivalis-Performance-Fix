@@ -11,9 +11,9 @@ disparu. Les menus avec de longues listes (sauvegardes, boutiques) s'ouvrent san
 plus quand on le quitte. Les résultats dépendent de ton processeur et de l'endroit où tu es. L'affichage, le
 gameplay et les sauvegardes ne changent pas.
 
-![Marché animé, sans et avec le mod : de 99 à 122 FPS en moyenne](docs/images/compare-market.png)
+![Marché animé, sans et avec le mod : de 99 à 122 FPS en moyenne](docs/images/compare-market.jpg)
 
-![Seaside Boardwalk, sans et avec le mod : de 111 à 126 FPS en moyenne](docs/images/compare-seaside.png)
+![Seaside Boardwalk, sans et avec le mod : de 111 à 126 FPS en moyenne](docs/images/compare-seaside.jpg)
 
 Mesuré sur mon PC avec la mise à jour « Update #3 » du jeu. Pleine taille : marché
 [sans](docs/images/full/market-off.jpg) / [avec](docs/images/full/market-on.jpg), Seaside Boardwalk
@@ -21,12 +21,13 @@ Mesuré sur mon PC avec la mise à jour « Update #3 » du jeu. Pleine taille : 
 
 ## Menus sans blocage
 
-Avec beaucoup de sauvegardes ou une grande boutique, le jeu se figeait à chaque ouverture de liste, parce qu'il
-reconstruisait toutes les lignes d'un coup. Le mod ne construit que les lignes visibles (les autres au fil du
-défilement), prépare le reste en arrière-plan et saute la reconstruction quand rien n'a changé. Défilement, filtres,
-recherche, tri et achats fonctionnent comme avant.
+Avec beaucoup de sauvegardes, une grande boutique, beaucoup de contacts ou d'avis, le jeu se figeait à chaque
+ouverture de liste, parce qu'il reconstruisait toutes les lignes d'un coup. Le mod ne construit que les lignes
+visibles (les autres au fil du défilement), prépare le reste pendant les écrans de chargement et les pauses, et saute
+la reconstruction quand rien n'a changé. Défilement, filtres, recherche, tri, achats et manette fonctionnent comme
+avant.
 
-![Durée du blocage à l'ouverture d'un menu, sans et avec le mod](docs/images/menu-freezes.png)
+![Durée du blocage à l'ouverture d'un menu, sans et avec le mod](docs/images/menu-freezes-v3.jpg)
 
 ## Ce que le mod change
 
@@ -52,10 +53,30 @@ recherche, tri et achats fonctionnent comme avant.
   catégorie 0,13 à 0,32 s. Maintenant 0,12 s et moins de 0,04 s : seuls les objets visibles sont affichés, et un
   clic sur un filtre reconstruit la liste une fois au lieu de deux. Filtres, recherche, tri et achats fonctionnent
   comme avant.
+- **Menu en jeu.** Contacts, journal et sac s'ouvrent deux à quatre fois plus vite (contacts : 133 → 53 ms la
+  première fois, 112 → 28 ms ensuite), le filtre « Personnel » des contacts passe de 0,3 s à 14 ms, et le menu se
+  ferme plus vite.
+- **Avis de l'établissement.** Avec un millier d'avis, l'onglet Avis s'ouvre en 0,1 s au lieu de 0,3 s, et changer
+  de période ne fige plus le jeu jusqu'à 1,9 s.
+- **Base des poissons, recettes, barres de défilement.** La base des poissons garde ses lignes d'une ouverture à
+  l'autre, les détails des recettes ne s'éteignent plus et ne se rallument plus à chaque clic, et les barres de
+  défilement ne remettent plus leur liste en page plusieurs fois.
+- **Dialogues.** La voix des répliques suivantes est chargée à l'avance : plus de blocage de 12 à 40 ms à chaque
+  réplique.
+- **Fumée et vapeur.** Les effets qui reviennent à l'écran ne rejouent plus d'un coup le temps où ils étaient cachés
+  (saccades de 50 à 65 ms en tournant la caméra).
+- **Réassort des boutiques.** Quelques fois par jour de jeu, les marchands mettent leur stock à jour : cette saccade
+  passe de 98 à 34 ms, en sautant une vérification dont le jeu n'utilise jamais le résultat.
+- **HUD.** Les lettres de la boussole et les horaires d'ouverture ne sont plus redessinés à chaque image.
+- **Chargement.** Les textures se chargent plus vite pendant les écrans de chargement : l'écran titre arrive environ
+  1 s plus tôt.
 - **Plantage en quittant.** Le jeu plantait à chaque fermeture (un bug d'Unity, présent aussi sans aucun mod).
   Corrigé.
-- **Tracked Quests HUD.** Si tu utilises le mod [Tracked Quests HUD](https://www.nexusmods.com/nivalisnights/mods/8) de Hvizeu, une saccade qu'il provoque quand
-  aucune quête n'est épinglée est supprimée.
+- **PNJ bloqués.** Un PNJ apparu hors de la zone où l'on peut marcher ne bougeait plus jamais (et remplissait le
+  journal d'avertissements). Il est maintenant remis sur son chemin.
+- **Tracked Quests HUD 1.0.** Si tu utilises le mod [Tracked Quests HUD](https://www.nexusmods.com/nivalisnights/mods/8)
+  1.0 de Hvizeu, une saccade qu'il provoque quand aucune quête n'est épinglée est supprimée. Les versions 1.1 et
+  suivantes la corrigent elles-mêmes.
 
 Chaque changement peut être désactivé dans la config.
 
@@ -71,8 +92,8 @@ Chaque changement peut être désactivé dans la config.
 Après une mise à jour du jeu ou une vérification des fichiers par Steam, le mod réapplique le réglage et redemande
 une relance.
 
-Pour vérifier que le mod tourne, la console BepInEx affiche `Nivalis Performance Fix 1.0.5: 14/14 optimizations active`
-(15/15 avec Tracked Quests HUD).
+Pour vérifier que le mod tourne, la console BepInEx affiche `Nivalis Performance Fix 1.0.6: 27/27 optimizations active`
+(28/28 avec Tracked Quests HUD 1.0).
 
 ## Configuration
 
@@ -87,9 +108,10 @@ tournes la caméra. 1000 Hz suffit largement.
 
 ## Compatibilité
 
-Testé avec [Nivalis Unofficial Patch](https://www.nexusmods.com/nivalisnights/mods/14),
-[Nivalis Config Manager](https://www.nexusmods.com/nivalisnights/mods/38) et [Tracked Quests HUD](https://www.nexusmods.com/nivalisnights/mods/8) de Hvizeu : aucun
-conflit. Quand les deux sont installés, Unofficial Patch coupe ses propres options de performance qui recoupent ce mod ;
+Testé avec [Nivalis Unofficial Patch](https://www.nexusmods.com/nivalisnights/mods/14) 0.3.13,
+[Nivalis Config Manager](https://www.nexusmods.com/nivalisnights/mods/38) et [Tracked Quests HUD](https://www.nexusmods.com/nivalisnights/mods/8) 1.1.10 de Hvizeu : aucun
+conflit (tests automatiques des menus avec et sans chacun d'eux, y compris les filtres et le tri des boutiques
+d'Unofficial Patch). Quand les deux sont installés, Unofficial Patch coupe ses propres options de performance qui recoupent ce mod ;
 ses correctifs restent actifs.
 
 Avec Nivalis Unofficial Patch 0.3.13, son option `[Performance] LightingRefreshCache` coûtait environ 9 % de FPS dans
@@ -118,11 +140,11 @@ le reprendre.
 ## Pour les développeurs
 
 Les changements viennent du profilage du jeu avec PIX et de la lecture du code désassemblé. La plupart sont des
-patchs Harmony sur des méthodes du jeu (personnages, apparition des PNJ, reflets, fenêtres de sauvegarde, de
-chargement et de boutique et leurs listes) ; les autres réécrivent quelques endroits du code natif, chacun retrouvé
-par signature d'octets et vérifié avant d'être modifié : la fréquence du ramasse-miettes, les lectures d'emploi du
-temps et de trajet des PNJ, les appels `Enum.HasFlag` du jeu, et un appel dans l'arrêt d'Unity (le plantage en
-quittant). Les valeurs Unity lues à chaque image passent par un appel direct au code compilé, donc le mod lui-même
+patchs Harmony sur des méthodes du jeu (personnages, apparition des PNJ, reflets, voix des dialogues, particules,
+HUD, menus et leurs listes) ; les autres réécrivent quelques endroits du code natif, chacun retrouvé par signature
+d'octets et vérifié avant d'être modifié : la fréquence du ramasse-miettes, les lectures d'emploi du temps et de
+trajet des PNJ, les appels `Enum.HasFlag` du jeu, la vérification du stock des marchands, et un appel dans l'arrêt
+d'Unity (le plantage en quittant). Les valeurs Unity lues à chaque image passent par un appel direct au code compilé, donc le mod lui-même
 ne crée pas de déchets en mémoire.
 
 Les outils de développement sont désactivés par défaut. Ils ont leur propre fichier,
@@ -133,6 +155,10 @@ menus de configuration en jeu :
   animé), **F10** mesure les temps d'image pendant 20 s.
 - Un journal écrit une ligne par minute et chaque saccade dans `BepInEx/NivalisPerformanceFix.playlog.log` ;
   **F11** marque une saccade ressentie. `python tools/analyze_playlog.py` le résume.
+- Des tests automatiques pilotés par des requêtes `BepInEx/NivalisPerformanceFix/bench/*.json` : un benchmark de
+  trajet (enregistrer une marche avec **Origine**, la rejouer avec **Fin**) et un test des menus qui charge une
+  sauvegarde, ouvre des fenêtres, clique, fait défiler, navigue avec une manette simulée, prend des captures et
+  vérifie leur contenu. `tools/uicompare.py` et `tools/monkeycompare.py` comparent deux passages (mod coupé / actif).
 
 La compilation nécessite le SDK .NET 6 et le jeu avec BepInEx installé et lancé une fois :
 

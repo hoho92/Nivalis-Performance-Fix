@@ -19,7 +19,7 @@ public class Plugin : BasePlugin
 {
     public const string Guid = "hoho92.nivalisperformancefix";
     public const string Name = "Nivalis Performance Fix";
-    public const string Version = "1.0.5";
+    public const string Version = "1.0.6";
 
     // prototypes this mod replaces; running both would apply some optimizations twice
     private static readonly string[] Superseded = { "hoho92.nivalis.animlod", "hoho92.nivalis.perftweaks", "hoho92.nivalis.animbatch" };
@@ -37,18 +37,31 @@ public class Plugin : BasePlugin
 
     internal static readonly List<Feature> Features = new()
     {
+        new FastLoading(),
         new AnimationLod(),
         new CharacterDetailsLod(),
         new PausedCharacters(),
         new PlayerGuiLayout(),
         new AgentThrottle(),
         new NavPathThrottle(),
+        new EconomyStockCheck(),
+        new StuckAgents(),
+        new HudRedraws(),
         new SpawnSpread(),
         new CameraThrottle(),
         new LensFlareOnce(),
+        new ParticleCatchUp(),
         new EnumFlagsInline(),
         new SaveMenusReuse(),
+        new SaveRowsParking(),
+        new ReviewRows(),
+        new ContactRows(),
+        new LazyLists(),
+        new RecipeDetails(),
+        new MenuScrollbars(),
+        new FishDatabaseRows(),
         new ShopWindows(),
+        new DialogueVoicePrefetch(),
         new ExitCrashFix(),
         new GcFrequency(),
         new QuestHudCompat(),
@@ -58,6 +71,9 @@ public class Plugin : BasePlugin
     public override void Load()
     {
         Log = base.Log;
+        NivalisPerformanceFix.Dev.BootLog.Mark("Nivalis Performance Fix: plugin load start");
+        NivalisPerformanceFix.Dev.BootLog.StartPixIfAsked();
+        NivalisPerformanceFix.Dev.FindProbe.StartIfAsked();
         Harmony = new Harmony(Guid);
 
         MasterEnabled = Config.Bind("General", "Enabled", true, "Master switch for every optimization below.");
@@ -70,17 +86,28 @@ public class Plugin : BasePlugin
             MetadataHelper.GetMetadata(this)));
 
         JobWorkers.Apply();
-        foreach (Feature f in Features.Where(f => !f.InstallLate)) f.Install();
+        foreach (Feature f in Features.Where(f => !f.InstallLate)) TimedInstall(f);
 
         ClassInjector.RegisterTypeInIl2Cpp<PerformanceBehaviour>();
         AddComponent<PerformanceBehaviour>();
+        NivalisPerformanceFix.Dev.BootLog.Mark("Nivalis Performance Fix: plugin load end");
+    }
+
+    private static void TimedInstall(Feature f)
+    {
+        var watch = System.Diagnostics.Stopwatch.StartNew();
+        f.Install();
+        NivalisPerformanceFix.Dev.BootLog.Install(f.Name, watch.Elapsed.TotalMilliseconds);
     }
 
     /// <summary>Second stage, once every plugin is loaded (first frame).</summary>
     internal static void LateStart()
     {
-        foreach (Feature f in Features.Where(f => f.InstallLate)) f.Install();
+        NivalisPerformanceFix.Dev.BootLog.Mark("first frame (late start)");
+        foreach (Feature f in Features.Where(f => f.InstallLate)) TimedInstall(f);
+        var devWatch = System.Diagnostics.Stopwatch.StartNew();
         Dev.Start();
+        NivalisPerformanceFix.Dev.BootLog.Install("developer tools start", devWatch.Elapsed.TotalMilliseconds);
 
         var superseded = Superseded.Where(g => IL2CPPChainloader.Instance.Plugins.ContainsKey(g)).ToList();
         int usable = Features.Count(f => f.Installed || f.Problem?.StartsWith("not needed") != true);
@@ -126,6 +153,15 @@ public class PerformanceBehaviour : MonoBehaviour
 
     private bool started;
 
+    /// <summary>Set by developer tools to collect each feature's Tick time (ms, summed).</summary>
+    internal static Dictionary<string, double> TickTimes;
+
+    private static void Add(Dictionary<string, double> times, string name, long t0)
+    {
+        double ms = (System.Diagnostics.Stopwatch.GetTimestamp() - t0) * 1000.0 / System.Diagnostics.Stopwatch.Frequency;
+        times[name] = times.TryGetValue(name, out double v) ? v + ms : ms;
+    }
+
     private void Update()
     {
         if (!started)
@@ -133,12 +169,20 @@ public class PerformanceBehaviour : MonoBehaviour
             started = true;
             Plugin.LateStart();
         }
+        var times = TickTimes; // developer tools: per-feature tick time (null = not measured)
         foreach (Feature f in Plugin.Features)
         {
             if (!f.Installed) continue;
+            long t0 = times != null ? System.Diagnostics.Stopwatch.GetTimestamp() : 0;
             try { f.Tick(); }
             catch (Exception e) { f.TickFailed(e); }
+            if (times != null) Add(times, f.Name, t0);
         }
+        long l0 = times != null ? System.Diagnostics.Stopwatch.GetTimestamp() : 0;
+        try { Features.ListTools.Tick(); }
+        catch (Exception e) { Plugin.Log.LogDebug($"ListTools: {e.Message}"); }
+        if (times != null) Add(times, "ListTools", l0);
         Plugin.Dev.Update();
+        NivalisPerformanceFix.Dev.BootLog.Update();
     }
 }

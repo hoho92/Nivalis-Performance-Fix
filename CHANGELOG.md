@@ -1,5 +1,68 @@
 # Changelog
 
+## 1.0.6 — 2026-10-08
+
+Menus without freezes, fewer stutters in play, faster launch, and two game bugs fixed. Menu times below are the
+slowest frame of the action, measured by an automated test (same save, same actions) without / with the mod.
+
+Menus:
+- In-game menu, Contacts tab (new, `[ContactRows]`): cells are prepared while the game is paused and only the rows
+  around the view are active. First opening 133 -> 53 ms, reopening 112 -> 28 ms, switching to the tab 87 -> 17 ms,
+  "Staff" filter 312 -> 14 ms.
+- In-game menu, Journal and Bag (new, `[LazyLists]`): only the visible rows are active and the rows are prepared
+  during loading. Journal first opening 148 -> 48 ms, reopening 75 -> 44 ms; Bag 109 -> 48 ms and 72 -> 37 ms.
+  Closing the menu 25-34 -> 13-19 ms.
+- Business window, Reviews tab (new, `[ReviewRows]`): with 1,016 reviews, opening the tab 324 -> 107 ms, period
+  "this month" 1,891 -> 322 ms (20 ms the second time), scrolling a whole month with the wheel no longer stutters.
+- Fish database (new, `[FishDatabaseRows]`): rows are kept instead of being destroyed and rebuilt at each opening
+  (56-60 -> 20-27 ms).
+- Recipes (new, `[RecipeDetails]`): the details panel is no longer switched off and on at each click; ingredient and
+  equipment rows are prepared in advance (reopening 50 -> 29 ms).
+- Scrollbars (new, `[MenuScrollbars]`): the game's scrollbars hide without resizing their list, which laid the list
+  out several times (skills tab animation, recipes...).
+- Pause menu with many saves (new, `[SaveRowsParking]`): the rows of the closed Save and Load windows are kept out of
+  the pause menu, whose fade walked them every frame.
+- Save and Load menus: first opening in game 1,561 / 2,631 -> 92 / 84 ms (1 s after pausing). Rows are prepared in
+  this order during loading: in-game menu, contacts, shops, then saves (the rest while paused). A reopened Load or
+  Save window no longer shows a save still selected.
+- Shops: first opening of a 281-item shop 1,300 -> 161 ms, closing 156 -> 36 ms. The rows to prepare are taken from
+  the largest vendor of the save instead of being learned at the first opening.
+
+Stutters in play:
+- Dialogues (new, `[DialogueVoices]`): the voice of the next lines is loaded in the background (12-40 ms freeze at
+  each line before).
+- Smoke and steam (new, `[ParticleCatchUp]`): looping effects resume where they stopped when they come back into
+  view, instead of simulating the missed time in one frame (50-65 ms hitch when turning the camera).
+- Vendor stock updates (new, `[Economy]`): a check whose result the game never uses is skipped; the update a few
+  times per in-game day went from 98 to 34 ms.
+- HUD (new, `[HudRedraws]`): the compass letters and the venue opening hours are no longer redrawn every frame
+  (11,337 -> 3,919 HUD redraws in 15 s); the hidden autosave icon no longer animates.
+
+Loading:
+- Faster loading (new, `[FastLoading]`): Unity uploads textures faster during the launch and loading screens. First
+  frame 20.0-20.3 -> 19.1 s, title screen usable about 1 s earlier.
+- The mod's searches for the menus during loading screens do 60% less work.
+
+Game bugs fixed:
+- Stuck NPCs (new, `[StuckNpcs]`): an NPC that ended up off the walkable area never moved again and Unity logged a
+  warning about 30 times per second (2,843 warnings in 80 s in Central Canyon). It is now put back on the nearest
+  walkable point (170 warnings, then none).
+
+Fixed during the 1.0.6 tests (automated tests with and without the mod, each setting off in turn, and with Nivalis
+Unofficial Patch 0.3.13 and Tracked Quests HUD 1.1.10):
+- Shops: after a big shop scrolled down, a small shop (e.g. the butcher's 9 offers) could open with an empty list.
+- Shops: after a filter or sorting change with a controller, the details panel could show another item than the
+  selected row. This affected the game's own sorting as well as Unofficial Patch's Decorations filter and price
+  sorting.
+- Recipes: the tab could open empty with a "Recipe title" placeholder (the category tiles must not be prepared in
+  advance; the setting is corrected automatically).
+
+Other:
+- Tracked Quests HUD: version 1.1 and later fix the hitch themselves; the mod's patch is then not installed
+  ("not needed" in the log) and stays for 1.0.
+- Turning a feature off in game now undoes what it changed (rows shown again, patches removed).
+- Developer tools stay off for players; the startup timeline is no longer printed unless they are on.
+
 ## 1.0.5 — 2026-10-06
 
 For the game's Update #3 (build of 2026-10-06).

@@ -7,7 +7,7 @@
     <TargetFramework>net6.0</TargetFramework>
     <AssemblyName>NivalisPerformanceFix</AssemblyName>
     <RootNamespace>NivalisPerformanceFix</RootNamespace>
-    <Version>1.0.5</Version>
+    <Version>1.0.6</Version>
     <Authors>hoho92</Authors>
     <Description>CPU performance and stutter fixes for Nivalis Nights (BepInEx IL2CPP).</Description>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
@@ -37,15 +37,25 @@
     <Reference Include="$(GameDir)\BepInEx\core\0Harmony.dll" />
     <Reference Include="$(GameDir)\BepInEx\core\Il2CppInterop.Runtime.dll" />
     <Reference Include="$(GameDir)\BepInEx\core\Il2CppInterop.Common.dll" />
+    <Reference Include="$(GameDir)\BepInEx\core\SemanticVersioning.dll" />
     <Reference Include="$(GameDir)\BepInEx\interop\Il2Cppmscorlib.dll" />
+    <Reference Include="$(GameDir)\BepInEx\interop\Il2CppSystem.Core.dll" />
     <Reference Include="$(GameDir)\BepInEx\interop\Assembly-CSharp.dll" />
     <Reference Include="$(GameDir)\BepInEx\interop\UnityEngine.CoreModule.dll" />
     <Reference Include="$(GameDir)\BepInEx\interop\Unity.InputSystem.dll" />
     <Reference Include="$(GameDir)\BepInEx\interop\Assembly-CSharp-firstpass.dll" />
     <Reference Include="$(GameDir)\BepInEx\interop\SALSA-LipSync.dll" />
     <Reference Include="$(GameDir)\BepInEx\interop\UnityEngine.AIModule.dll" />
+    <Reference Include="$(GameDir)\BepInEx\interop\UnityEngine.AudioModule.dll" />
+    <Reference Include="$(GameDir)\BepInEx\interop\DOTween.dll" />
+    <Reference Include="$(GameDir)\BepInEx\interop\UnityEngine.ParticleSystemModule.dll" />
+    <Reference Include="$(GameDir)\BepInEx\interop\UnityEngine.UIModule.dll" />
     <Reference Include="$(GameDir)\BepInEx\interop\UnityEngine.UI.dll" />
     <Reference Include="$(GameDir)\BepInEx\interop\Unity.TextMeshPro.dll" />
+    <Reference Include="$(GameDir)\BepInEx\interop\Cinemachine.dll" />
+    <Reference Include="$(GameDir)\BepInEx\interop\UnityEngine.ScreenCaptureModule.dll" />
+    <Reference Include="$(GameDir)\BepInEx\interop\UnityEngine.PhysicsModule.dll" />
+    <Reference Include="$(GameDir)\BepInEx\interop\UnityEngine.AnimationModule.dll" />
   </ItemGroup>
 
   <Target Name="InstallToGame" AfterTargets="Build"

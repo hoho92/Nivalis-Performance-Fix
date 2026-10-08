@@ -13,7 +13,7 @@ namespace NivalisPerformanceFix.Features;
 /// mod hides the unpinned rows again: with no pinned quest, a 40-60 ms hitch that ends with an empty HUD.
 /// When no quest is pinned (and that mod hides business reminders), we skip the rebuild and just empty both
 /// lists, as the game does when there are no quests. With a pinned quest the game runs unchanged.
-/// Only active when that mod is installed.
+/// Only active with versions 1.0.x of that mod: from 1.1 it skips that rebuild itself.
 /// </summary>
 internal sealed class QuestHudCompat : Feature
 {
@@ -32,6 +32,11 @@ internal sealed class QuestHudCompat : Feature
         if (!IL2CPPChainloader.Instance.Plugins.TryGetValue("hvizeu.nivalis.trackedquestshud", out var info) ||
             info.Instance is not BasePlugin p)
             return "not needed: Tracked Quests HUD mod not installed";
+        // from 1.1 that mod skips the empty rebuild itself (hides the group instead): leave it to it. The version it
+        // declares to BepInEx (shown in the log), not its DLL's: that one is only right while its author updates it
+        var version = info.Metadata.Version;
+        if (version != null && (version.Major > 1 || version.Major == 1 && version.Minor >= 1))
+            return $"not needed: Tracked Quests HUD {version} skips the empty rebuild itself";
         if (!p.Config.TryGetEntry("HUD", "HideBusinessReminders", out hideBusiness))
             return "Tracked Quests HUD version not recognised";
         instance = this;

@@ -20,12 +20,15 @@ namespace NivalisPerformanceFix.Features;
 /// - Rows: the UI layout cost is per ACTIVE row (each layout pass walks all of them; one row component even runs a
 ///   nested ForceRebuildLayoutImmediate). Only the rows around the view are active (the first VisibleRows when a
 ///   window opens), the others are switched on as they come into view, with their place kept so the scrollbar
-///   does not move (see LazyRows). Every save stays reachable.
+///   does not move (see LazyRows). Every save stays reachable. The inactive rows are parked out of the rows
+///   container (uneven LazyRows, as the shops): left in it, each layout of the list walked all ~190 (8-9 ms).
 /// - Reopening: the windows are hidden with a CanvasGroup, so their rows stay alive and bound between openings.
 ///   When the save list is unchanged (same names and timestamps) and nothing was saved or deleted since the
 ///   window's last build, we skip the rebuild and
 ///   replay only the rest of the game's Show (state reset, scroll to the top, rows unselected, controller focus,
-///   show the panel), hiding again the rows revealed by scrolling.
+///   show the panel), hiding again the rows revealed by scrolling. The save list for that check is read once per
+///   scene, behind the loading screen, and again only after a save or a delete (reading it opens every save file:
+///   ~45 ms at each opening before).
 /// - Screenshots: SerializationManager keeps decoded screenshots in a cache (_saveScreenshots). We fill it in the
 ///   background, one save per frame, so the first opening finds them ready.
 /// - Rows: a window creates its row objects the first time it needs them. After the screenshots, the rows of both
@@ -60,7 +63,7 @@ internal sealed unsafe class SaveMenusReuse : Feature
     private int saveRows;                      // rows the Save window shows: "new save" + non-autosaves
     private bool loadFound, saveFound;
     private int searchTries, searchWait;
-    private const int SearchTries = 10, SearchGapFrames = 300;
+    private const int SearchTries = 40;
 
     protected override void BindSettings(ConfigFile config)
     {
@@ -81,8 +84,10 @@ internal sealed unsafe class SaveMenusReuse : Feature
         LazyRows.Install();
         Patch(typeof(LoadUI), nameof(LoadUI.Show), nameof(LoadShowPrefix), nameof(LoadShowPostfix));
         Patch(typeof(SaveUI), nameof(SaveUI.Show), nameof(SaveShowPrefix), nameof(SaveShowPostfix));
-        Patch(typeof(SerializationManager), nameof(SerializationManager.Save), nameof(InvalidateAll), null);
-        Patch(typeof(SerializationManager), nameof(SerializationManager.DeleteSave), nameof(InvalidateAll), null);
+        // before and after: the game writes synchronously (decompiled 2026-10-08), but a list read in between would be
+        // kept until the next save or scene
+        Patch(typeof(SerializationManager), nameof(SerializationManager.Save), nameof(InvalidateAll), nameof(InvalidateAll));
+        Patch(typeof(SerializationManager), nameof(SerializationManager.DeleteSave), nameof(InvalidateAll), nameof(InvalidateAll));
         return null;
     }
 
@@ -109,13 +114,14 @@ internal sealed unsafe class SaveMenusReuse : Feature
     {
         loadMenu.Built = null;
         saveMenu.Built = null;
+        knownSaves = null;
     }
 
     /// <summary>LoadUI.Show without its row rebuild (BeginUpdate .. EndUpdate).</summary>
     private static void ReopenLoad(LoadUI w)
     {
         w._deleting = false;
-        ResetList(w.scrollRect, w.toggleGroup);
+        ResetList(w.slotList, w.scrollRect, w.toggleGroup);
         w.questDetails?.InitializeEmpty();
         FinishShow(w);
     }
@@ -126,16 +132,26 @@ internal sealed unsafe class SaveMenusReuse : Feature
         w._saving = false;
         w._deleting = false;
         w._currentSelectedSave = string.Empty;
-        ResetList(w.scrollRect, w.toggleGroup);
+        ResetList(w.slotList, w.scrollRect, w.toggleGroup);
         FinishShow(w);
     }
 
-    private static void ResetList(ScrollRect scroll, ToggleGroup group)
+    private static void ResetList(ItemListUI list, ScrollRect scroll, ToggleGroup group)
     {
         if (scroll is not null) ScrollRectExtensions.SetVerticalNormalizedPositionWithoutSfx(scroll);
-        if (group is null) return;
-        group.allowSwitchOff = true;
-        group.SetAllTogglesOff(true); // Show re-binds every row with its toggle off
+        if (group is not null)
+        {
+            group.allowSwitchOff = true;
+            group.SetAllTogglesOff(true);
+        }
+        // Show re-binds every row with its toggle off (SaveSlotUi.Show: toggle.isOn = false). The group alone missed
+        // the rows that left it while inactive or parked: a row selected at the last opening stayed selected, with
+        // its details, the mouse back on (and the controller's first row could be another one; monkey test 2026-10-08)
+        var rows = list?._itemDisplayInstances;
+        int count = Math.Min(rows?.Count ?? 0, list?._displayedInstanceCount ?? 0);
+        for (int i = 0; i < count; i++)
+            if (rows[i]?.GameObject is { } go && go.GetComponent<SaveSlotUi>()?.toggle is { isOn: true } t)
+                t.isOn = false;
     }
 
     private static void FinishShow(UIPanel w)
@@ -157,10 +173,14 @@ internal sealed unsafe class SaveMenusReuse : Feature
             if (m.Pending != null && m.Built is not null && Direct.Alive(m.Built) && m.Built.Pointer == panel.Pointer &&
                 m.Pending == m.Signature && l is not null && l._displayedInstanceCount == m.Count)
             {
+                var watch = System.Diagnostics.Stopwatch.StartNew();
                 reopen(); // unselects every row first (hidden toggles leave the group)
+                double reopenMs = watch.Elapsed.TotalMilliseconds;
                 StartLazy(l, scroll, m.Count); // back to the top rows (Show scrolled to the top)
+                Dev.LayoutLog.Note($"{self.Name}: reopened without rebuild (game part {reopenMs:F1} ms, rows {watch.Elapsed.TotalMilliseconds - reopenMs:F1} ms)");
                 return false;
             }
+            LazyRows.Park(l, 0, self.visibleRows.Value); // unused rows out of the rows container (see LazyRows)
             LazyRows.Begin(l, 0, self.visibleRows.Value);
         }
         catch (Exception e)
@@ -186,17 +206,24 @@ internal sealed unsafe class SaveMenusReuse : Feature
     }
 
     private static void StartLazy(ItemListUI l, ScrollRect scroll, int count) =>
-        LazyRows.Start(self, l, scroll, count, 0, self.visibleRows.Value, self.marginRows.Value);
+        LazyRows.Start(self, l, scroll, count, 0, self.visibleRows.Value, self.marginRows.Value, uneven: true);
 
     /// <summary>Save names + timestamps, in the game's order; null if unavailable.</summary>
     private static string SaveSignature()
     {
-        var saves = ReadSaves();
+        var saves = KnownSaves();
         if (saves == null) return null;
         var sb = new StringBuilder();
         foreach (var s in saves) sb.Append(s.Name).Append('|').Append(s.UnixTimestamp).Append('\n');
         return sb.ToString();
     }
+
+    // The save list as last read. GetValidSaves opens every save file to read its header (~45 ms for 198 saves,
+    // file checks included; PIX 2026-10-07), and the signature check ran it at every opening of either window.
+    // The saves only change when the game writes or deletes one (InvalidateAll) or in another scene.
+    private static List<SaveEntry> knownSaves;
+
+    private static List<SaveEntry> KnownSaves() => knownSaves ??= ReadSaves();
 
     private readonly struct SaveEntry
     {
@@ -289,19 +316,27 @@ internal sealed unsafe class SaveMenusReuse : Feature
         TickPreload();
     }
 
+    protected override void SwitchedOff()
+    {
+        loadMenu.Built = saveMenu.Built = null; // the next openings rebuild their rows, all shown
+        LazyRows.ShowAllOf(this);
+    }
+
     // ---- screenshot preload ----
 
     private void TickPreload()
     {
         if (!Active || !preloadScreenshots.Value) return;
-        int handle = Direct.ActiveSceneHandle;
+        int handle = ListTools.LoadingIndex;
         if (handle != sceneHandle) // new scene: wait a little, then (re)check every save once
         {
             sceneHandle = handle;
             preloadNames.Clear(); preloadIndex = 0; preloadDelay = 300;
             loadFound = saveFound = false; searchTries = 0; searchWait = 0;
+            knownSaves = null;
             return;
         }
+        if (preloadDelay > 0 && ListTools.Loading) preloadDelay = 0; // the save list is read behind the loading screen
         if (preloadDelay > 0) { preloadDelay--; return; }
         if (preloadDelay == 0) { preloadDelay = -1; CollectNames(); }
         if (preloadIndex >= preloadNames.Count) { TickPrebuild(); return; }
@@ -322,21 +357,25 @@ internal sealed unsafe class SaveMenusReuse : Feature
     /// <summary>Queues the Load and Save windows of the scene for row prebuild (RowPrebuilder makes one row per frame).</summary>
     private void TickPrebuild()
     {
-        if (!(loadFound && saveFound) && searchTries < SearchTries && --searchWait <= 0)
+        if (!(loadFound && saveFound) && ListTools.Quiet && searchTries < SearchTries && ListTools.SearchDue(ref searchWait))
         {
-            searchTries++;
-            searchWait = SearchGapFrames;
+            if (!ListTools.Loading) searchTries++; // behind the loading screen the windows may come late
             try
             {
                 int queued = 0;
+                // saves come last behind the loading screen (held 2 s at most): the rows left are made while the game
+                // is paused (menus) and their window hidden; waiting for the next loading screen left the Save window's
+                // first opening at 408 ms (UI test 2026-10-08)
                 foreach (var o in UnityEngine.Object.FindObjectsOfType(Il2CppType.Of<LoadUI>(), true))
-                    if (o.TryCast<LoadUI>()?.slotList is { } l && RowPrebuilder.Add(l, preloadNames.Count, Name))
+                    if (o.TryCast<LoadUI>() is { slotList: { } l } load &&
+                        RowPrebuilder.Add(l, preloadNames.Count, Name, _ => LazyRows.ParkLastRow(l), RowPrebuilder.Saves, () => Ready(load)))
                     {
                         queued++;
                         loadFound = true;
                     }
                 foreach (var o in UnityEngine.Object.FindObjectsOfType(Il2CppType.Of<SaveUI>(), true))
-                    if (o.TryCast<SaveUI>()?.slotList is { } l && RowPrebuilder.Add(l, saveRows, Name))
+                    if (o.TryCast<SaveUI>() is { slotList: { } l } save &&
+                        RowPrebuilder.Add(l, saveRows, Name, _ => LazyRows.ParkLastRow(l), RowPrebuilder.Saves, () => Ready(save)))
                     {
                         queued++;
                         saveFound = true;
@@ -353,12 +392,16 @@ internal sealed unsafe class SaveMenusReuse : Feature
         RowPrebuilder.Step();
     }
 
+    /// <summary>Save rows may be made now: behind the loading screen, or paused with their window hidden.</summary>
+    private bool Ready(UIPanel window) =>
+        Active && (ListTools.Loading || (Time.timeScale == 0 && Direct.Alive(window) && !window.IsVisible));
+
     private void CollectNames()
     {
         try
         {
             saveRows = 1;
-            foreach (var s in ReadSaves() ?? new List<SaveEntry>())
+            foreach (var s in KnownSaves() ?? new List<SaveEntry>())
             {
                 preloadNames.Add(s.Name);
                 if (!s.IsAutoSave) saveRows++;
