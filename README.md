@@ -1,7 +1,5 @@
 ![Nivalis Performance Fix](docs/banner.jpg)
 
-*[Version française](README.fr.md)*
-
 Nivalis Nights can struggle in busy places like the markets, and a powerful graphics card doesn't help much: the
 game is held back by the CPU. This BepInEx mod takes load off the CPU where you can't see the difference.
 

@@ -18,7 +18,7 @@ $stage = Join-Path $root "dist/stage"
 Remove-Item $stage -Recurse -Force -ErrorAction SilentlyContinue
 $pluginDir = New-Item -ItemType Directory -Force (Join-Path $stage "BepInEx/plugins/NivalisPerformanceFix")
 Copy-Item $dll $pluginDir
-foreach ($f in "README.md", "README.fr.md", "CHANGELOG.md", "LICENSE") { Copy-Item (Join-Path $root $f) $pluginDir }
+foreach ($f in "README.md", "CHANGELOG.md", "LICENSE") { Copy-Item (Join-Path $root $f) $pluginDir }
 
 $zip = Join-Path $root "dist/NivalisPerformanceFix-$version.zip"
 Remove-Item $zip -Force -ErrorAction SilentlyContinue
