@@ -19,7 +19,7 @@ public class Plugin : BasePlugin
 {
     public const string Guid = "hoho92.nivalisperformancefix";
     public const string Name = "Nivalis Performance Fix";
-    public const string Version = "1.0.7";
+    public const string Version = "1.0.8";
 
     // prototypes this mod replaces; running both would apply some optimizations twice
     private static readonly string[] Superseded = { "hoho92.nivalis.animlod", "hoho92.nivalis.perftweaks", "hoho92.nivalis.animbatch" };
@@ -64,6 +64,7 @@ public class Plugin : BasePlugin
         new DialogueVoicePrefetch(),
         new ExitCrashFix(),
         new GcFrequency(),
+        new QuestHudRefresh(),
         new QuestHudCompat(),
     };
     internal static DevTools Dev;

@@ -264,6 +264,8 @@ internal sealed partial class UiBench
         stepLength = step.S > 0 ? step.S : Defaultlength(step);
         PerformanceBehaviour.TickTimes = new Dictionary<string, double>();
         if (request.Time.Count > 0) MethodTimers.Take(); // counts from this step on
+        hudRequests = QuestHudRefresh.Requests;
+        hudRebuilds = QuestHudRefresh.Rebuilds;
         Go(Phase.Step);
         UnityEngine.Debug.Log($"[UiBench] step {result.N} {result.Step}");
         var actionWatch = System.Diagnostics.Stopwatch.StartNew();
@@ -368,6 +370,12 @@ internal sealed partial class UiBench
                 break;
             case "wait":
                 break;
+            case "pin":
+                PinQuest(s.Index, s.Count);
+                break;
+            case "hud":
+                CheckHud(s.Name);
+                break;
             default:
                 Note($"unknown step '{s.Do}'");
                 break;
@@ -411,6 +419,7 @@ internal sealed partial class UiBench
             if (result.MaxMs > SlowFrameMs) Note($"SLOW FRAME {result.MaxMs:F0} ms");
         }
         if (step.Do.Equals("nav", StringComparison.OrdinalIgnoreCase)) NavReport();
+        HudReport();
         if (PerformanceBehaviour.TickTimes is { } ticks && ticks.Where(x => x.Value >= 2).ToList() is { Count: > 0 } slow)
             Note("ticks " + string.Join(", ", slow.OrderByDescending(x => x.Value).Select(x => $"{x.Key} {x.Value:F0} ms")));
         PerformanceBehaviour.TickTimes = null;

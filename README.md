@@ -62,6 +62,8 @@ and the gamepad work as before.
   skipping a check whose result the game never uses. The game's Update #4 removed that check itself, so this part
   only works on older versions of the game.
 - **HUD.** The compass letters and the opening hours are no longer redrawn every frame.
+- **Quest HUD.** When several quests update at once (for example while serving at your venue), the game rebuilt the
+  quest list on the right of the screen up to 5 times in one frame (73-83 ms stutters). It is now rebuilt once.
 - **Loading.** Textures upload faster during loading screens: the title screen shows up about 1 s earlier.
 - **Crash when quitting.** The game crashed every time you quit (a Unity bug, also without any mod). Fixed.
 - **Stuck NPCs.** An NPC that spawned off the walkable area never moved again (and filled the log with warnings). It
@@ -82,8 +84,8 @@ Each one can be turned off in the config.
 
 After a game update or a Steam file check, the mod applies the thread setting again and asks for one more restart.
 
-To check it's running, the BepInEx console shows `Nivalis Performance Fix 1.0.7: 26/26 optimizations active`
-(27/27 with Tracked Quests HUD 1.0).
+To check it's running, the BepInEx console shows `Nivalis Performance Fix 1.0.8: 27/27 optimizations active`
+(28/28 with Tracked Quests HUD 1.0).
 
 ## Configuration
 

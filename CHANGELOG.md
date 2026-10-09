@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.0.8 — 2026-10-09
+
+- Quest HUD (new, `[QuestHudRefresh]`): when several quest updates arrive in the same frame (for example while
+  serving at your venue), the game rebuilt the quest list on the right of the screen once per update, up to 5 times
+  in one frame: 73-83 ms stutters every few seconds. It is now rebuilt once (14-18 ms). The HUD shows exactly the
+  same thing; tested with and without Tracked Quests HUD.
+
 ## 1.0.7 — 2026-10-09
 
 Compatibility with the game's Update #4 (2026-10-09).

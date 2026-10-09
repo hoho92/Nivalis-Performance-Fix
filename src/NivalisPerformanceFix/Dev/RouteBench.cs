@@ -84,6 +84,8 @@ internal sealed class RouteBench
         public bool LayoutLog { get; set; }
         /// <summary>Object names whose components HudProbe.Inspect logs at the start of the first run.</summary>
         public List<string> Inspect { get; set; } = new();
+        /// <summary>Seconds between quest pin toggles (3 in one frame) during each run, HUD checked at its end; 0 = off.</summary>
+        public float QuestHud { get; set; }
     }
 
     private sealed class ClockRequest
@@ -131,6 +133,8 @@ internal sealed class RouteBench
         public string Clock { get; set; }
         /// <summary>Photo spot: the screenshot taken at the end of the run (path under bench).</summary>
         public string Shot { get; set; }
+        /// <summary>Quest HUD test (request "questHud"): toggles, refresh requests / rebuilds, end check.</summary>
+        public string QuestHud { get; set; }
         /// <summary>Job worker threads of this launch (boot.config: the original file gives the engine's default).</summary>
         public int Workers { get; set; }
         /// <summary>Every measured frame, in ms (frame-time graphs); only in photorun.py launches ("only" set).</summary>
@@ -591,7 +595,8 @@ internal sealed class RouteBench
     private readonly List<int> perSecond = new();
     private readonly List<Hitch> hitches = new();
     private readonly FrameSplit.Window split = new();
-    private float runTime, secondTime;
+    private float runTime, secondTime, nextPin;
+    private int pins, hudRequests, hudRebuilds;
     private int secondFrames, sample;
     private double pathError;
     private string pixName;
@@ -631,6 +636,8 @@ internal sealed class RouteBench
         frames.Clear(); perSecond.Clear(); split.Reset(); hitches.Clear();
         runTime = secondTime = 0;
         secondFrames = 0;
+        nextPin = request.QuestHud; pins = 0;
+        hudRequests = Features.QuestHudRefresh.Requests; hudRebuilds = Features.QuestHudRefresh.Rebuilds;
         Mark("start");
         sample = 0;
         pathError = 0;
@@ -674,6 +681,11 @@ internal sealed class RouteBench
         }
 
         if (pixName == null && request.Pix is { } pix && pix.Run == runIndex + 1 && runTime >= pix.At) StartPix(pix);
+        if (request.QuestHud > 0 && runTime >= nextPin)
+        {
+            nextPin += request.QuestHud;
+            QuestHudTest.Pin(pins++ % 3, 3); // several quest events in one frame, as while serving at a venue
+        }
 
         List<float[]> s = route.Samples;
         if (request.Clock is { } clock)
@@ -694,6 +706,15 @@ internal sealed class RouteBench
         at[5] = Mathf.Lerp(a[5], b[5], k);
         Place(at, out float error);
         if (frames.Count > 2) pathError = Math.Max(pathError, error); // first frames: still at the settle point
+    }
+
+    private string QuestHudSummary()
+    {
+        string check = string.Join(" / ", QuestHudTest.Check("end of run"));
+        string text = $"{pins} x 3 toggles, {Features.QuestHudRefresh.Requests - hudRequests} requests, " +
+                      $"{Features.QuestHudRefresh.Rebuilds - hudRebuilds} rebuilds, {check}";
+        if (check.Contains("STALE")) Plugin.Log.LogWarning($"Route {route.Name}: {check}");
+        return text;
     }
 
     private void EndRun()
@@ -717,6 +738,7 @@ internal sealed class RouteBench
             PixCapture = pixName,
             Clock = Clock(),
             Shot = route.Photo ? PhotoShot() : null,
+            QuestHud = request.QuestHud > 0 ? QuestHudSummary() : null,
             Workers = Unity.Jobs.LowLevel.Unsafe.JobsUtility.JobWorkerMaximumCount,
             FrameMs = request.Only.Length > 0 ? frames.Select(x => (float)Math.Round(x * 1000, 1)).ToList() : null,
         };
@@ -843,7 +865,8 @@ internal sealed class RouteBench
                 sb.AppendLine($"- run {r.Run} ({r.Variant}): {r.AvgFps} FPS, 1% low {r.Low1}, p99 {r.P99Ms}, max {r.MaxMs}, " +
                               $"path error {r.PathErrorMax} m{(r.Split.Length > 0 ? ", " + r.Split : "")}" +
                               (r.PixCapture != null ? $", PIX capture {r.PixCapture}" : "") + $", game clock {r.Clock}" +
-                              (r.Shot != null ? $", photo {r.Shot}" : ""));
+                              (r.Shot != null ? $", photo {r.Shot}" : "") +
+                              (r.QuestHud != null ? $", quest HUD: {r.QuestHud}" : ""));
             foreach (var r in group.Where(r => r.Hitches.Count > 0))
                 sb.AppendLine($"- run {r.Run} frames > {HitchMs:F0} ms: " + string.Join(", ", r.Hitches.Take(30).Select(h =>
                     $"t {h.T:F1} s {h.Ms:F0} ms at ({h.Pos[0]:F0} {h.Pos[1]:F0} {h.Pos[2]:F0}) crowd {h.CrowdMs:F1} render {h.RenderMs:F1}{(h.Gc ? " GC" : "")}{(h.Clock != null ? " clock " + h.Clock : "")}")) +

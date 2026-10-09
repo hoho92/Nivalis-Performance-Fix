@@ -70,6 +70,9 @@ avant.
   « Update #4 » du jeu a retiré cette vérification elle-même : cette partie ne sert plus que sur les anciennes
   versions du jeu.
 - **HUD.** Les lettres de la boussole et les horaires d'ouverture ne sont plus redessinés à chaque image.
+- **HUD des quêtes.** Quand plusieurs quêtes se mettent à jour en même temps (par exemple pendant le service dans ton
+  restaurant), le jeu reconstruisait la liste des quêtes à droite de l'écran jusqu'à 5 fois dans la même image
+  (saccades de 73 à 83 ms). Elle n'est plus reconstruite qu'une fois.
 - **Chargement.** Les textures se chargent plus vite pendant les écrans de chargement : l'écran titre arrive environ
   1 s plus tôt.
 - **Plantage en quittant.** Le jeu plantait à chaque fermeture (un bug d'Unity, présent aussi sans aucun mod).
@@ -94,8 +97,8 @@ Chaque changement peut être désactivé dans la config.
 Après une mise à jour du jeu ou une vérification des fichiers par Steam, le mod réapplique le réglage et redemande
 une relance.
 
-Pour vérifier que le mod tourne, la console BepInEx affiche `Nivalis Performance Fix 1.0.7: 26/26 optimizations active`
-(27/27 avec Tracked Quests HUD 1.0).
+Pour vérifier que le mod tourne, la console BepInEx affiche `Nivalis Performance Fix 1.0.8: 27/27 optimizations active`
+(28/28 avec Tracked Quests HUD 1.0).
 
 ## Configuration
 

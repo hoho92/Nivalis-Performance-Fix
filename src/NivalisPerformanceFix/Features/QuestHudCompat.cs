@@ -45,11 +45,12 @@ internal sealed class QuestHudCompat : Feature
         return null;
     }
 
-    private static bool RefreshPrefix(ActiveJournalEntriesUi __instance)
+    private static bool RefreshPrefix(ActiveJournalEntriesUi __instance, bool __runOriginal)
     {
         QuestHudCompat self = instance;
         try
         {
+            if (!__runOriginal) return false; // request deferred by QuestHudRefresh: decided when it runs
             if (self == null || !self.Active || !self.hideBusiness.Value) return true;
             QuestManager qm = QuestManager.Instance;
             if (qm == null) return true;
