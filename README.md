@@ -59,7 +59,8 @@ and the gamepad work as before.
 - **Smoke and steam.** Effects coming back into view no longer replay the time they were hidden in one frame (hitches
   of 50-65 ms when turning the camera).
 - **Shops restocking.** A few times per in-game day, vendors update their stock: that hitch went from 98 to 34 ms by
-  skipping a check whose result the game never uses.
+  skipping a check whose result the game never uses. The game's Update #4 removed that check itself, so this part
+  only works on older versions of the game.
 - **HUD.** The compass letters and the opening hours are no longer redrawn every frame.
 - **Loading.** Textures upload faster during loading screens: the title screen shows up about 1 s earlier.
 - **Crash when quitting.** The game crashed every time you quit (a Unity bug, also without any mod). Fixed.
@@ -81,8 +82,8 @@ Each one can be turned off in the config.
 
 After a game update or a Steam file check, the mod applies the thread setting again and asks for one more restart.
 
-To check it's running, the BepInEx console shows `Nivalis Performance Fix 1.0.6: 27/27 optimizations active`
-(28/28 with Tracked Quests HUD 1.0).
+To check it's running, the BepInEx console shows `Nivalis Performance Fix 1.0.7: 26/26 optimizations active`
+(27/27 with Tracked Quests HUD 1.0).
 
 ## Configuration
 
@@ -128,7 +129,7 @@ I stop, updates may stop too. The code is MIT-licensed, so anyone is welcome to 
 The changes come from profiling the game with PIX and reading the disassembly. Most are Harmony patches on game
 methods (characters, NPC spawns, lens flares, dialogue voices, particles, the HUD, the menus and their lists); the
 others rewrite a few spots of native code, each found by byte signature and checked before it is changed: the garbage
-collector's frequency, NPC schedule and path reads, the game's `Enum.HasFlag` calls, the vendor stock check, and one
+collector's frequency, NPC schedule and path reads, the game's `Enum.HasFlag` calls, the vendor stock check (game versions before Update #4), and one
 call in Unity's shutdown (the crash on quit). Per-frame reads of Unity values call the compiled methods directly, so the mod itself creates no
 garbage.
 

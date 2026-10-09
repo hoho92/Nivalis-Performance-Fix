@@ -235,17 +235,16 @@ internal static class RowPrebuilder
 
     /// <summary>
     /// One more cell for a grid list, made by the game's AddItem as if the list were being filled past its shown
-    /// cells (count and isUpdating put back after); row containers it had to make are hidden like unused rows.
+    /// cells (count put back after); row containers it had to make are hidden like unused rows.
     /// </summary>
     private static GameObject MakeGridCell(ItemListUI l)
     {
-        if (l.isUpdating) return null; // the game is filling it: next frame
+        if (l._fillRoutine is not null) return null; // the game is filling it in batches: next frame
         int shown = l._displayedInstanceCount;
         var rowData = l._rowData;
         int rowsBefore = rowData?.Count ?? 0;
         IItemDisplayUI item;
         l._displayedInstanceCount = l._itemDisplayInstances.Count; // the next cell is a new one
-        l.isUpdating = true;
         try
         {
             item = l.AddItem(true, true);
@@ -253,7 +252,6 @@ internal static class RowPrebuilder
         finally
         {
             l._displayedInstanceCount = shown;
-            l.isUpdating = false;
         }
         if (rowData is not null)
             for (int r = rowsBefore; r < rowData.Count; r++)

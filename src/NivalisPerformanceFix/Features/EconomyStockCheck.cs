@@ -1,4 +1,5 @@
 using System;
+using System.Runtime.InteropServices;
 using Il2CppInterop.Runtime;
 using NivalisPerformanceFix.Native;
 
@@ -40,6 +41,8 @@ internal sealed unsafe class EconomyStockCheck : Feature
         if (method == null) return "VendorItem.GetDetailedStock not found";
 
         var hits = NativeCode.Scan(method, MaxFunctionSize, NativeCode.Pattern(SiteSignature));
+        if (hits.Count == 0 && !HasCheckLambdas())
+            return "not needed: the game no longer runs the check (game update of 2026-10-09)";
         if (hits.Count != 1) return $"code signature found {hits.Count} times (game update?)";
         site = (byte*)hits[0] + SiteOffset;
 
@@ -63,6 +66,16 @@ internal sealed unsafe class EconomyStockCheck : Feature
         jump = new byte[] { 0xE9, (byte)rel, (byte)(rel >> 8), (byte)(rel >> 16), (byte)(rel >> 24), 0x90, 0x90 };
         Plugin.Log.LogDebug($"{Name}: jump at {NativeCode.Rva(site)} -> {NativeCode.Rva(target)} ({checkCalls} calls skipped)");
         return null;
+    }
+
+    /// <summary>The check's two LINQ lambdas (&lt;GetDetailedStock&gt;b__N_0/1), gone since the game update of 2026-10-09.</summary>
+    private static bool HasCheckLambdas()
+    {
+        IntPtr klass = Il2CppClassPointerStore<Nivalis.Economy.VendorItem>.NativeClassPtr;
+        IntPtr iter = IntPtr.Zero, mi;
+        while ((mi = IL2CPP.il2cpp_class_get_methods(klass, ref iter)) != IntPtr.Zero)
+            if (Marshal.PtrToStringAnsi(IL2CPP.il2cpp_method_get_name(mi))?.StartsWith("<GetDetailedStock>") == true) return true;
+        return false;
     }
 
     private static bool Matches(byte* p, byte[] bytes)

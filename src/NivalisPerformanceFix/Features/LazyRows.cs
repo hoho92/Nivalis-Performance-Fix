@@ -117,8 +117,7 @@ internal static class LazyRows
     /// <summary>
     /// ItemListUI.EndUpdate (list mode) restricted to the active range: rows before the count are switched on, the
     /// others off, then the list's layout is marked for rebuild. (The game also calls IReturnToPoolHandler on unused
-    /// rows; the save and shop rows do not implement it, and grid lists are never rebuilt here.) Like the game's, it
-    /// clears isUpdating, else the next BeginUpdate logs "ItemListUI was already being updated!".
+    /// rows; the save and shop rows do not implement it, and grid lists are never rebuilt here.)
     /// </summary>
     private static bool EndUpdatePrefix(ItemListUI __instance)
     {
@@ -137,7 +136,6 @@ internal static class LazyRows
                 SetActive(rows[i]?.GameObject, i < count && i >= rangeBegin && i < rangeEnd);
             if (__instance._itemDisplayParent?.TryCast<RectTransform>() is { } parent)
                 LayoutRebuilder.MarkLayoutForRebuild(parent);
-            __instance.isUpdating = false; // set by BeginUpdate (game update of 2026-10-06): the next one checks it
             return false;
         }
         catch (Exception e)

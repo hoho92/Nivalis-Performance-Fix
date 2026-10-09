@@ -291,8 +291,15 @@ internal sealed class RouteBench
                 else if (stepTime > LoadTimeout) Finish($"save '{route.Save}' did not load");
                 break;
             case Step.WaitLoadEnd:
-                if (!ListTools.Loading && !ListTools.Held && Controller() is not null) StartRoute();
-                else if (stepTime > LoadTimeout) Finish("loading did not end");
+                // since the game update of 2026-10-09 the loading screen can end before the old zone is unloaded /
+                // the new one loaded: also wait for the route's zone
+                if (!ListTools.Loading && !ListTools.Held && Controller() is not null &&
+                    string.Equals(Zone(), route.Zone, StringComparison.OrdinalIgnoreCase)) StartRoute();
+                else if (stepTime > LoadTimeout)
+                {
+                    if (!ListTools.Loading && !ListTools.Held) StartRoute(); // skips it, naming the loaded zone
+                    else Finish("loading did not end");
+                }
                 break;
             case Step.Settle:
                 if (ListTools.Loading || ListTools.Held) { stepTime = 0; break; } // held loading screen: the world is not shown yet
@@ -524,7 +531,9 @@ internal sealed class RouteBench
         string zone = Zone();
         if (zone == null || !zone.Equals(route.Zone, StringComparison.OrdinalIgnoreCase))
         {
-            Skip($"recorded in {route.Zone}, loaded zone is {zone}");
+            var scenes = new List<string>();
+            for (int i = 0; i < SceneManager.sceneCount; i++) scenes.Add(SceneManager.GetSceneAt(i).name);
+            Skip($"recorded in {route.Zone}, loaded zone is {zone} (scenes: {string.Join(", ", scenes)})");
             return;
         }
         float lightHour = request.Clock != null ? -1 : request.Hour; // clock run: the light follows the clock

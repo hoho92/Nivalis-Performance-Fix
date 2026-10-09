@@ -28,11 +28,13 @@ internal sealed unsafe class NavPathThrottle : Feature
     private ConfigEntry<int> interval;
 
     //   mov rcx,[rcx+18h]; test rcx,rcx; je X; xor edx,edx; call get_path; test rax,rax; je X;
-    //   xor r8d,r8d; mov rdx,[rsp+0A0h]; mov rcx,rax; call GetCornersNonAlloc; mov esi,eax
+    //   xor r8d,r8d; mov rdx,[rsp+disp32]; mov rcx,rax; call GetCornersNonAlloc
+    // (then the count is kept: mov esi,eax before the game update of 2026-10-09, mov r14d,eax since; the corners
+    // array was at rsp+0A0h, now rsp+0B0h)
     private const string Signature =
         "48 8B 49 18 48 85 C9 0F 84 ?? ?? ?? ?? 33 D2 E8 ?? ?? ?? ?? 48 85 C0 0F 84 ?? ?? ?? ?? " +
-        "45 33 C0 48 8B 94 24 A0 00 00 00 48 8B C8 E8 ?? ?? ?? ?? 8B F0";
-    private const int PatchStart = 13, PatchEnd = 48, GetPathCall = 15, CornersCall = 43;
+        "45 33 C0 48 8B 94 24 ?? ?? 00 00 48 8B C8 E8 ?? ?? ?? ??";
+    private const int PatchStart = 13, PatchEnd = 48, GetPathCall = 15, CornersCall = 43, ArrayLoad = 32;
 
     // state block: +0 int frame, +4 byte active, +8 int interval; +0x10 RUNTIME_FUNCTION, +0x20 UNWIND_INFO; code at +0x40
     private byte* state;
@@ -58,7 +60,7 @@ internal sealed unsafe class NavPathThrottle : Feature
         if (hits.Count != 1) return $"code signature found {hits.Count} times (game update?)";
         byte* site = (byte*)hits[0];
 
-        // sanity: the count is then compared with the state machine's corners field: cmp esi,[rdi+40h]
+        // sanity: the count is then compared with the state machine's corners field: cmp esi/r14d,[rdi+40h]
         bool cmpFound = false;
         for (int i = PatchEnd; i < PatchEnd + 0x100 && !cmpFound; i++)
             cmpFound = site[i] == 0x3B && site[i + 1] == 0x77 && site[i + 2] == 0x40;
@@ -129,8 +131,10 @@ internal sealed unsafe class NavPathThrottle : Feature
             Plugin.Log.LogWarning($"{Name}: could not register unwind info");
         Tick();
 
-        // mov rdx,[rsp+0A0h]; mov r8,rdi; call stub; nop...
-        var patch = new List<byte> { 0x48, 0x8B, 0x94, 0x24, 0xA0, 0x00, 0x00, 0x00, 0x49, 0x89, 0xF8, 0xE8 };
+        // mov rdx,[rsp+disp32] (the game's own load); mov r8,rdi; call stub; nop...
+        var patch = new List<byte>();
+        for (int i = 0; i < 8; i++) patch.Add(site[ArrayLoad + i]);
+        patch.AddRange(new byte[] { 0x49, 0x89, 0xF8, 0xE8 });
         patch.AddRange(BitConverter.GetBytes(NativeCode.Rel32(site + PatchStart + 16, stub)));
         while (patch.Count < PatchEnd - PatchStart) patch.Add(0x90);
         NativeCode.WriteCode(site + PatchStart, patch.ToArray());

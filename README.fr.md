@@ -66,7 +66,9 @@ avant.
 - **Fumée et vapeur.** Les effets qui reviennent à l'écran ne rejouent plus d'un coup le temps où ils étaient cachés
   (saccades de 50 à 65 ms en tournant la caméra).
 - **Réassort des boutiques.** Quelques fois par jour de jeu, les marchands mettent leur stock à jour : cette saccade
-  passe de 98 à 34 ms, en sautant une vérification dont le jeu n'utilise jamais le résultat.
+  passe de 98 à 34 ms, en sautant une vérification dont le jeu n'utilise jamais le résultat. La mise à jour
+  « Update #4 » du jeu a retiré cette vérification elle-même : cette partie ne sert plus que sur les anciennes
+  versions du jeu.
 - **HUD.** Les lettres de la boussole et les horaires d'ouverture ne sont plus redessinés à chaque image.
 - **Chargement.** Les textures se chargent plus vite pendant les écrans de chargement : l'écran titre arrive environ
   1 s plus tôt.
@@ -92,8 +94,8 @@ Chaque changement peut être désactivé dans la config.
 Après une mise à jour du jeu ou une vérification des fichiers par Steam, le mod réapplique le réglage et redemande
 une relance.
 
-Pour vérifier que le mod tourne, la console BepInEx affiche `Nivalis Performance Fix 1.0.6: 27/27 optimizations active`
-(28/28 avec Tracked Quests HUD 1.0).
+Pour vérifier que le mod tourne, la console BepInEx affiche `Nivalis Performance Fix 1.0.7: 26/26 optimizations active`
+(27/27 avec Tracked Quests HUD 1.0).
 
 ## Configuration
 
@@ -143,7 +145,8 @@ Les changements viennent du profilage du jeu avec PIX et de la lecture du code d
 patchs Harmony sur des méthodes du jeu (personnages, apparition des PNJ, reflets, voix des dialogues, particules,
 HUD, menus et leurs listes) ; les autres réécrivent quelques endroits du code natif, chacun retrouvé par signature
 d'octets et vérifié avant d'être modifié : la fréquence du ramasse-miettes, les lectures d'emploi du temps et de
-trajet des PNJ, les appels `Enum.HasFlag` du jeu, la vérification du stock des marchands, et un appel dans l'arrêt
+trajet des PNJ, les appels `Enum.HasFlag` du jeu, la vérification du stock des marchands (versions du jeu
+d'avant « Update #4 »), et un appel dans l'arrêt
 d'Unity (le plantage en quittant). Les valeurs Unity lues à chaque image passent par un appel direct au code compilé, donc le mod lui-même
 ne crée pas de déchets en mémoire.
 

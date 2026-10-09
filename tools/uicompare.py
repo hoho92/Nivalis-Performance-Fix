@@ -16,7 +16,7 @@ TOLERANCE = 24  # per channel: small rendering noise (animated HUD, particles) i
 
 
 def find(folder: Path, part: str) -> Path:
-    runs = sorted(p for p in folder.glob("*.json") if part in p.stem)
+    runs = sorted(p for p in folder.glob("*.json") if part in p.stem and not p.stem.endswith(".steps"))
     if not runs:
         sys.exit(f"no run matching '{part}' in {folder}")
     return runs[-1]  # latest

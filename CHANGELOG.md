@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.0.7 — 2026-10-09
+
+Compatibility with the game's Update #4 (2026-10-09).
+
+- Menu lists: the game removed a field the mod wrote when it rebuilds a list; every list update logged an error
+  ("Method not found: ItemListUI.set_isUpdating"). Fixed.
+- Navigation path throttle: the game's walking code changed, so the feature turned itself off. It is back on: the
+  game still reads every walking NPC's path each frame.
+- Vendor stock updates (`[Economy]`): the game now skips the unused check itself. The console shows "not needed" on
+  the new game version; older versions are still patched.
+
 ## 1.0.6 — 2026-10-08
 
 Menus without freezes, fewer stutters in play, faster launch, and two game bugs fixed. Menu times below are the
