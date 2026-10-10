@@ -100,14 +100,8 @@ One tip unrelated to the mod: a mouse polling at 2000 Hz or more costs FPS in th
 Tested together with [Nivalis Unofficial Patch](https://www.nexusmods.com/nivalisnights/mods/14) 0.3.13,
 [Nivalis Config Manager](https://www.nexusmods.com/nivalisnights/mods/38) and Hvizeu's [Tracked Quests HUD](https://www.nexusmods.com/nivalisnights/mods/8) 1.1.10: no
 conflict (automated menu tests with and without each of them, including Unofficial Patch's shop filters and sorting). When both are installed, Unofficial Patch switches off its own performance options that overlap this mod;
-its fixes keep working.
-
-With Nivalis Unofficial Patch 0.3.13, its `[Performance] LightingRefreshCache` option cost about 9% FPS in my tests
-(busy market, same spot, measured several times). If you use both mods, set it to `false` in
-`hvizeu.nivalis.unofficialpatch.cfg`: all its other fixes keep working. I've let its author know. This mod also
-mentions it in the BepInEx console at startup.
-
-![The startup warning in the BepInEx console](docs/images/console-lighting-warning.png)
+its fixes keep working. Unofficial Patch 0.3.47 rechecked in a market run: no FPS loss, including with its
+`LightingRefreshCache` option on (it cost about 9% in 0.3.13).
 
 ## If the game updates
 

@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- Nivalis Unofficial Patch 0.3.47: its `LightingRefreshCache` option no longer costs FPS with this mod (market
+  route, 3 runs off / 3 on: 165 vs 167 FPS; it was about -9% in 0.3.13). The startup warning about it is removed.
+
 ## 1.0.8 — 2026-10-09
 
 - Quest HUD (new, `[QuestHudRefresh]`): when several quest updates arrive in the same frame (for example while
